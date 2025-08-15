@@ -1,18 +1,19 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import SearchBar from "./components/SearchBar";
+import Header from "./components/header";
+import { BrowserRouter } from "react-router-dom";
 
 function App() {
-  const [count, setCount] = useState(0)
-
   return (
-    <>
-      <h1 className="text-3xl font-bold underline bg" >
-      Hello world!
-    </h1>
-    </>
-  )
+    <BrowserRouter>
+      <>
+        <SearchBar />
+        <Header />
+        <main className="pt-32 sm:pt-40">
+          {/* Your pages go here */}
+        </main>
+      </>
+    </BrowserRouter>
+  );
 }
 
-export default App
+export default App;
