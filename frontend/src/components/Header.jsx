@@ -11,6 +11,7 @@ export default function Header() {
     { name: "Buy Vehicles", path: "/vehicles" },
     { name: "Sell Vehicle", path: "/sell" },
     { name: "Contact", path: "/contact" },
+    { name: "Admin Dashboard", path: "/admin/dashboard" },
   ];
 
   return (
