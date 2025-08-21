@@ -4,7 +4,7 @@ const mongoose = require("mongoose");
 
 const vehicleModelBrandSchema = new mongoose.Schema({
   category: { type: String, required: true },
-  brand: { type: String, required: true },
+  brand: { type: String },
   model: { type: String, required: true }
 });
 
@@ -14,10 +14,14 @@ const VehicleModelBrand = mongoose.model("vehiclemodelbrand", vehicleModelBrandS
 router.post("/add", async (req, res) => {
   try {
     const { category, brand, model } = req.body;
-    if (!category || !brand || !model) {
-      return res.status(400).json({ error: "All fields are required" });
+    if (!category || !model) {
+      return res.status(400).json({ error: "Category and model are required" });
     }
-    const newEntry = new VehicleModelBrand({ category, brand, model });
+    // For Bicycles, brand is optional
+    if (category !== "Bicycles" && !brand) {
+      return res.status(400).json({ error: "Brand is required for this category" });
+    }
+    const newEntry = new VehicleModelBrand({ category, brand: brand || "", model });
     await newEntry.save();
     res.status(201).json({ message: "Vehicle added", entry: newEntry });
   } catch (err) {

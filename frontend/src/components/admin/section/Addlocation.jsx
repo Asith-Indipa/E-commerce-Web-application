@@ -17,6 +17,7 @@ export default function Addlocation() {
   const [editSubLocation, setEditSubLocation] = useState("");
   const [newSubLocation, setNewSubLocation] = useState("");
   const [viewDistrict, setViewDistrict] = useState("");
+  const [deleteModal, setDeleteModal] = useState({ open: false, district: null, subLocation: null });
 
   // Fetch locations from backend
   const fetchLocations = async () => {
@@ -100,14 +101,17 @@ export default function Addlocation() {
     }
   };
 
-  const handleDelete = async (district, subLocation) => {
-    if (!window.confirm("Are you sure you want to delete this sub location?")) return;
+  const handleDelete = (district, subLocation) => {
+    setDeleteModal({ open: true, district, subLocation });
+  };
+
+  const confirmDelete = async () => {
     setError("");
     try {
       const res = await fetch("http://localhost:5000/api/location/delete", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ district, subLocation }),
+        body: JSON.stringify({ district: deleteModal.district, subLocation: deleteModal.subLocation }),
       });
       const data = await res.json();
       if (res.ok) {
@@ -118,6 +122,7 @@ export default function Addlocation() {
     } catch {
       setError("Network error");
     }
+    setDeleteModal({ open: false, district: null, subLocation: null });
   };
 
   // Sorted districts for dropdown
@@ -189,9 +194,9 @@ export default function Addlocation() {
           <div className="text-gray-500 text-sm">No sub locations for this district.</div>
         )}
         {viewDistrict !== "" && subLocationsToShow.length > 0 && (
-          <div className="mb-4 bg-white rounded-lg shadow p-3 w-full">
+          <div className="mb-4 bg-white rounded-lg shadow p-3 w-full overflow-x-auto">
             <span className="inline-block bg-blue-100 text-blue-700 px-3 py-1 rounded-full font-semibold mb-2">{viewDistrict}</span>
-            <div className="flex flex-wrap gap-2 sm:gap-4 mt-2 overflow-x-auto">
+            <div className="flex flex-wrap gap-2 sm:gap-4 mt-2">
               {subLocationsToShow.slice().sort().map((sub, idx) =>
                 editDistrict === viewDistrict && editSubLocation === sub ? (
                   <div key={idx} className="flex items-center gap-2 w-full min-w-[180px]">
@@ -248,6 +253,31 @@ export default function Addlocation() {
           </div>
         )}
       </div>
+      {/* Custom Delete Modal */}
+      {deleteModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-xs mx-auto text-center">
+            <h4 className="text-lg font-semibold mb-2 text-red-600">Delete Sub Location</h4>
+            <p className="mb-4 text-gray-700">
+              Are you sure you want to delete <span className="font-bold text-blue-700">{deleteModal.subLocation}</span> from <span className="font-bold text-blue-700">{deleteModal.district}</span>?
+            </p>
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={confirmDelete}
+                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-all font-semibold"
+              >
+                Yes, Delete
+              </button>
+              <button
+                onClick={() => setDeleteModal({ open: false, district: null, subLocation: null })}
+                className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 transition-all font-semibold"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
