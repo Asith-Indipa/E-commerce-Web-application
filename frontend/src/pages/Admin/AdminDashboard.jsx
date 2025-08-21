@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import HomeTab from "../../components/admin/section/HomeTab";
 import UserTab from "../../components/admin/section/UserTab";
 import VehicleDetailsTab from "../../components/admin/section/VehicleDetailsTab";
+import Addlocation from "../../components/admin/section/Addlocation"; // import Addlocation
 
 export default function AdminDashboard() {
   const [activeTab, setActiveTab] = useState("home");
@@ -28,11 +29,18 @@ export default function AdminDashboard() {
         >
           Manage Vehicle Details
         </button>
+        <button
+          className={`w-full sm:w-auto px-3 sm:px-4 py-2 rounded ${activeTab === "location" ? "bg-blue-600 text-white" : "bg-gray-200 text-gray-700"} text-sm sm:text-base`}
+          onClick={() => setActiveTab("location")}
+        >
+          Add Location
+        </button>
       </div>
       <div className="bg-white shadow rounded-lg p-4 sm:p-6 min-h-[180px]">
         {activeTab === "home" && <HomeTab />}
         {activeTab === "users" && <UserTab />}
         {activeTab === "vehicles" && <VehicleDetailsTab />}
+        {activeTab === "location" && <Addlocation />}
       </div>
     </div>
   );
