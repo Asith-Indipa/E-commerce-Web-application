@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { BASE_URL } from "../../../util/api.js"; // Add this import
 
 export default function VehicleDetailsTab() {
   const [categories, setCategories] = useState([]);
@@ -18,11 +19,15 @@ export default function VehicleDetailsTab() {
   const [editCategoryValue, setEditCategoryValue] = useState("");
   const [showCategories, setShowCategories] = useState(true);
   const [deleteModal, setDeleteModal] = useState({ open: false, category: null });
+  const [deleteVehicleModal, setDeleteVehicleModal] = useState({ open: false, vehicle: null });
+  const [showVehicles, setShowVehicles] = useState(true);
+  const [sortCategoryAsc, setSortCategoryAsc] = useState(true);
+  const [filterCategory, setFilterCategory] = useState("All");
 
   // Fetch categories from backend
   const fetchCategories = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/vehiclecategory/all");
+      const res = await fetch(`${BASE_URL}/api/vehiclecategory/all`);
       const data = await res.json();
       setCategories(data);
     } catch {
@@ -33,7 +38,7 @@ export default function VehicleDetailsTab() {
   // Fetch all vehicles from backend
   const fetchVehicles = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/vehiclemodelbrand/all");
+      const res = await fetch(`${BASE_URL}/api/vehiclemodelbrand/all`);
       const data = await res.json();
       setVehicles(data);
     } catch {
@@ -51,7 +56,7 @@ export default function VehicleDetailsTab() {
     setError("");
     if (newCategory && !categories.includes(newCategory)) {
       try {
-        const res = await fetch("http://localhost:5000/api/vehiclecategory/add", {
+        const res = await fetch(`${BASE_URL}/api/vehiclecategory/add`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ category: newCategory }),
@@ -83,7 +88,7 @@ export default function VehicleDetailsTab() {
     setError("");
     if (!editCategoryValue) return;
     try {
-      const res = await fetch("http://localhost:5000/api/vehiclecategory/edit", {
+      const res = await fetch(`${BASE_URL}/api/vehiclecategory/edit`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -113,7 +118,7 @@ export default function VehicleDetailsTab() {
   const confirmDeleteCategory = async () => {
     setError("");
     try {
-      const res = await fetch("http://localhost:5000/api/vehiclecategory/delete", {
+      const res = await fetch(`${BASE_URL}/api/vehiclecategory/delete`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ category: deleteModal.category }),
@@ -134,25 +139,76 @@ export default function VehicleDetailsTab() {
     e.preventDefault();
     setLoading(true);
     setError("");
-    try {
-      const res = await fetch("http://localhost:5000/api/vehiclemodelbrand/add", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category, brand, model }),
-      });
-      const data = await res.json();
-      if (res.ok) {
-        setSubmitted({ category, brand, model });
-        setCategory("");
-        setBrand("");
-        setModel("");
-        fetchVehicles();
-      } else {
-        setError(data.error || "Failed to submit");
+    // Validation logic
+    if (!category) {
+      setError("Category is required");
+      setLoading(false);
+      return;
+    }
+    
+    // For Boats & Water Transport, we don't require brand and model
+    if (category === "Bicycles" || category === "Boats & Water Transport") {
+      if (!brand) {
+        setError("Brand is required");
+        setLoading(false);
+        return;
       }
-      fetchCategories();
-    } catch (err) {
-      setError("Network error");
+      const payload = { category, brand, model: "N/A" };
+      
+      try {
+        const res = await fetch(`${BASE_URL}/api/vehiclemodelbrand/add`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setSubmitted({ category, brand, model: payload.model });
+          setCategory("");
+          setBrand("");
+          setModel("");
+          fetchVehicles();
+        } else {
+          setError(data.error || "Failed to submit");
+        }
+        fetchCategories();
+      } catch (err) {
+        setError("Network error");
+      }
+    } else {
+      // Standard validation for other categories
+      if (!brand) {
+        setError("Brand is required");
+        setLoading(false);
+        return;
+      }
+      if (!model) {
+        setError("Model is required");
+        setLoading(false);
+        return;
+      }
+      const payload = { category, brand, model };
+      
+      try {
+        const res = await fetch(`${BASE_URL}/api/vehiclemodelbrand/add`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          setSubmitted({ category, brand, model: payload.model });
+          setCategory("");
+          setBrand("");
+          setModel("");
+          fetchVehicles();
+        } else {
+          setError(data.error || "Failed to submit");
+        }
+        fetchCategories();
+      } catch (err) {
+        setError("Network error");
+      }
     }
     setLoading(false);
   };
@@ -167,7 +223,7 @@ export default function VehicleDetailsTab() {
   const handleEditSubmit = async (e) => {
     e.preventDefault();
     try {
-      const res = await fetch(`http://localhost:5000/api/vehiclemodelbrand/edit/${editId}`, {
+      const res = await fetch(`${BASE_URL}/api/vehiclemodelbrand/edit/${editId}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -183,16 +239,37 @@ export default function VehicleDetailsTab() {
     } catch {}
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this entry?")) return;
+  const handleDelete = async (id, vehicle) => {
+    setDeleteVehicleModal({ open: true, vehicle });
+  };
+
+  const confirmDeleteVehicle = async () => {
+    if (!deleteVehicleModal.vehicle) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/vehiclemodelbrand/delete/${id}`, {
+      const res = await fetch(`${BASE_URL}/api/vehiclemodelbrand/delete/${deleteVehicleModal.vehicle._id}`, {
         method: "DELETE",
       });
       if (res.ok) {
         fetchVehicles();
       }
     } catch {}
+    setDeleteVehicleModal({ open: false, vehicle: null });
+  };
+
+  const sortedVehicles = vehicles.slice().sort((a, b) => {
+    const valA = (a.category || "").toLowerCase();
+    const valB = (b.category || "").toLowerCase();
+    if (valA < valB) return sortCategoryAsc ? -1 : 1;
+    if (valA > valB) return sortCategoryAsc ? 1 : -1;
+    return 0;
+  });
+
+  const filteredVehicles = filterCategory === "All"
+    ? sortedVehicles
+    : sortedVehicles.filter(v => v.category === filterCategory);
+
+  const handleCategorySort = () => {
+    setSortCategoryAsc((prev) => !prev);
   };
 
   return (
@@ -286,7 +363,7 @@ export default function VehicleDetailsTab() {
           </div>
         )}
       </div>
-      {/* Custom Delete Modal */}
+      {/* Custom Delete Modal for Category */}
       {deleteModal.open && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
           <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-xs mx-auto text-center">
@@ -311,6 +388,40 @@ export default function VehicleDetailsTab() {
           </div>
         </div>
       )}
+      {/* Custom Delete Modal for Vehicle */}
+      {deleteVehicleModal.open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-xs mx-auto text-center">
+            <h4 className="text-lg font-semibold mb-2 text-red-600">Delete Vehicle</h4>
+            <p className="mb-4 text-gray-700">
+              Are you sure you want to delete
+              <span className="font-bold text-blue-700">
+                {" "}
+                {deleteVehicleModal.vehicle.brand}
+                {deleteVehicleModal.vehicle.model && deleteVehicleModal.vehicle.model !== "N/A"
+                  ? ` (${deleteVehicleModal.vehicle.model})`
+                  : ""}
+              </span>
+              ?
+            </p>
+            <div className="flex gap-4 justify-center">
+              <button
+                onClick={confirmDeleteVehicle}
+                className="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700 transition-all font-semibold"
+              >
+                Yes, Delete
+              </button>
+              <button
+                onClick={() => setDeleteVehicleModal({ open: false, vehicle: null })}
+                className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 transition-all font-semibold"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      
       <form
         onSubmit={handleSubmit}
         className="flex flex-col gap-3 mb-4 max-w-md w-full"
@@ -329,39 +440,58 @@ export default function VehicleDetailsTab() {
             ))}
           </select>
         </label>
-        {/* Only show brand input if category is not Bicycles */}
-        {category !== "Bicycles" && (
-          <label className="text-sm font-medium">
-            Brand Name
-            <input
-              type="text"
-              value={brand}
-              onChange={(e) => setBrand(e.target.value)}
-              className="border rounded px-3 py-2 w-full mt-1"
-              placeholder="Enter brand name"
-              required
-            />
-          </label>
+        {/* Hide brand/model/button for Boats & Water Transport */}
+        {category === "Boats & Water Transport" ? null : (
+          <>
+            {category === "Bicycles" ? (
+              <label className="text-sm font-medium">
+                Brand Name
+                <input
+                  type="text"
+                  value={brand}
+                  onChange={(e) => setBrand(e.target.value)}
+                  className="border rounded px-3 py-2 w-full mt-1"
+                  placeholder="Enter brand name"
+                  required
+                />
+              </label>
+            ) : (
+              <>
+                <label className="text-sm font-medium">
+                  Brand Name
+                  <input
+                    type="text"
+                    value={brand}
+                    onChange={(e) => setBrand(e.target.value)}
+                    className="border rounded px-3 py-2 w-full mt-1"
+                    placeholder="Enter brand name"
+                    required
+                  />
+                </label>
+                <label className="text-sm font-medium">
+                  Model
+                  <input
+                    type="text"
+                    value={model}
+                    onChange={(e) => setModel(e.target.value)}
+                    className="border rounded px-3 py-2 w-full mt-1"
+                    placeholder="Enter model"
+                    required
+                  />
+                </label>
+              </>
+            )}
+            <button
+              type="submit"
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2 text-sm sm:text-base w-full sm:w-auto"
+              disabled={loading}
+            >
+              {loading ? "Adding..." : "Add Vehicle"}
+            </button>
+          </>
         )}
-        <label className="text-sm font-medium">
-          Model
-          <input
-            type="text"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            className="border rounded px-3 py-2 w-full mt-1"
-            placeholder="Enter model"
-            required
-          />
-        </label>
-        <button
-          type="submit"
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 mt-2 text-sm sm:text-base w-full sm:w-auto"
-          disabled={loading}
-        >
-          {loading ? "Adding..." : "Add Vehicle"}
-        </button>
       </form>
+      
       {error && <div className="text-red-600 text-sm mb-2">{error}</div>}
       {submitted && (
         <div className="bg-green-50 border border-green-200 rounded p-3 text-green-700 text-sm sm:text-base">
@@ -370,85 +500,122 @@ export default function VehicleDetailsTab() {
           <div><strong>Model:</strong> {submitted.model}</div>
         </div>
       )}
-      <h3 className="text-lg font-semibold mt-8 mb-2">All Vehicles</h3>
-      <div className="overflow-x-auto w-full">
-        <table className="min-w-full bg-white border rounded text-xs sm:text-base">
-          <thead>
-            <tr>
-              <th className="px-2 sm:px-4 py-2 border">Category</th>
-              <th className="px-2 sm:px-4 py-2 border">Brand</th>
-              <th className="px-2 sm:px-4 py-2 border">Model</th>
-              <th className="px-2 sm:px-4 py-2 border">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {vehicles.map((v) =>
-              editId === v._id ? (
-                <tr key={v._id}>
-                  <td className="px-2 sm:px-4 py-2 border">
-                    <input
-                      type="text"
-                      value={editCategory}
-                      onChange={(e) => setEditCategory(e.target.value)}
-                      className="border rounded px-2 py-1 w-full text-xs sm:text-base"
-                    />
-                  </td>
-                  <td className="px-2 sm:px-4 py-2 border">
-                    <input
-                      type="text"
-                      value={editBrand}
-                      onChange={(e) => setEditBrand(e.target.value)}
-                      className="border rounded px-2 py-1 w-full text-xs sm:text-base"
-                    />
-                  </td>
-                  <td className="px-2 sm:px-4 py-2 border">
-                    <input
-                      type="text"
-                      value={editModel}
-                      onChange={(e) => setEditModel(e.target.value)}
-                      className="border rounded px-2 py-1 w-full text-xs sm:text-base"
-                    />
-                  </td>
-                  <td className="px-2 sm:px-4 py-2 border flex flex-col sm:flex-row gap-2">
-                    <button
-                      onClick={handleEditSubmit}
-                      className="bg-blue-600 text-white px-2 py-1 rounded"
-                    >
-                      Save
-                    </button>
-                    <button
-                      onClick={() => setEditId(null)}
-                      className="bg-gray-400 text-white px-2 py-1 rounded"
-                    >
-                      Cancel
-                    </button>
-                  </td>
-                </tr>
-              ) : (
-                <tr key={v._id}>
-                  <td className="px-2 sm:px-4 py-2 border">{v.category}</td>
-                  <td className="px-2 sm:px-4 py-2 border">{v.brand}</td>
-                  <td className="px-2 sm:px-4 py-2 border">{v.model}</td>
-                  <td className="px-2 sm:px-4 py-2 border flex flex-col sm:flex-row gap-2">
-                    <button
-                      onClick={() => handleEdit(v)}
-                      className="bg-yellow-500 text-white px-2 py-1 rounded"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => handleDelete(v._id)}
-                      className="bg-red-600 text-white px-2 py-1 rounded"
-                    >
-                      Delete
-                    </button>
-                  </td>
-                </tr>
-              )
-            )}
-          </tbody>
-        </table>
+      <h3 className="text-lg font-semibold mt-8 mb-2 flex items-center justify-between">
+        <span>All Vehicles</span>
+        <button
+          onClick={() => setShowVehicles((prev) => !prev)}
+          className={`px-3 py-1 rounded-full shadow text-sm font-semibold transition-all
+            ${showVehicles
+              ? "bg-blue-600 text-white hover:bg-blue-700"
+              : "bg-gray-200 text-blue-700 hover:bg-blue-100"
+            }`
+          }
+          aria-label={showVehicles ? "Hide vehicles" : "Show vehicles"}
+        >
+          {showVehicles ? "Hide" : "Show"}
+        </button>
+      </h3>
+      {/* Category filter dropdown */}
+      <div className="mb-4 max-w-xs">
+        <label className="block text-sm font-medium mb-1">Filter by Category:</label>
+        <select
+          value={filterCategory}
+          onChange={e => setFilterCategory(e.target.value)}
+          className="border rounded px-3 py-2 w-full"
+        >
+          <option value="All">All</option>
+          {categories.map(cat => (
+            <option key={cat} value={cat}>{cat}</option>
+          ))}
+        </select>
       </div>
+      {showVehicles && (
+        <div className="overflow-x-auto w-full">
+          <table className="min-w-full bg-white border rounded text-xs sm:text-base">
+            <thead>
+              <tr>
+                <th
+                  className="px-2 sm:px-4 py-2 border cursor-pointer"
+                  onClick={handleCategorySort}
+                  title="Sort by Category"
+                >
+                  Category
+                  <span className="ml-1">{sortCategoryAsc ? "▲" : "▼"}</span>
+                </th>
+                <th className="px-2 sm:px-4 py-2 border">Brand</th>
+                <th className="px-2 sm:px-4 py-2 border">Model</th>
+                <th className="px-2 sm:px-4 py-2 border">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredVehicles.map((v) =>
+                editId === v._id ? (
+                  <tr key={v._id}>
+                    <td className="px-2 sm:px-4 py-2 border">
+                      <input
+                        type="text"
+                        value={editCategory}
+                        onChange={(e) => setEditCategory(e.target.value)}
+                        className="border rounded px-2 py-1 w-full text-xs sm:text-base"
+                      />
+                    </td>
+                    <td className="px-2 sm:px-4 py-2 border">
+                      <input
+                        type="text"
+                        value={editBrand}
+                        onChange={(e) => setEditBrand(e.target.value)}
+                        className="border rounded px-2 py-1 w-full text-xs sm:text-base"
+                      />
+                    </td>
+                    <td className="px-2 sm:px-4 py-2 border">
+                      <input
+                        type="text"
+                        value={editModel}
+                        onChange={(e) => setEditModel(e.target.value)}
+                        className="border rounded px-2 py-1 w-full text-xs sm:text-base"
+                      />
+                    </td>
+                    <td className="px-2 sm:px-4 py-2 border flex flex-col sm:flex-row gap-2">
+                      <button
+                        onClick={handleEditSubmit}
+                        className="bg-blue-600 text-white px-2 py-1 rounded"
+                      >
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditId(null)}
+                        className="bg-gray-400 text-white px-2 py-1 rounded"
+                      >
+                        Cancel
+                      </button>
+                    </td>
+                  </tr>
+                ) : (
+                  <tr key={v._id}>
+                    <td className="px-2 sm:px-4 py-2 border">{v.category}</td>
+                    <td className="px-2 sm:px-4 py-2 border">{v.brand}</td>
+                    <td className="px-2 sm:px-4 py-2 border">{v.model}</td>
+                    <td className="px-2 sm:px-4 py-2 border flex flex-col sm:flex-row gap-2">
+                      <button
+                        onClick={() => handleEdit(v)}
+                        className="bg-yellow-500 text-white px-2 py-1 rounded"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => handleDelete(v._id, v)}
+                        className="bg-red-600 text-white px-2 py-1 rounded"
+                      >
+                        Delete
+                      </button>
+                    </td>
+                  </tr>
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

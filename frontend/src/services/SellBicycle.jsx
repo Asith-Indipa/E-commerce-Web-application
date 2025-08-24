@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom"; // Add this import
+import { BASE_URL } from "../util/api.js"; // Add this import
 
 const conditions = ["Used", "Reconditioned", "New"];
-const brands = ["Brand 1", "Brand 2", "Brand 3"];
 
 export default function SellBicycle() {
   const [location, setLocation] = useState("Kamburupitiya");
@@ -16,12 +16,15 @@ export default function SellBicycle() {
   const [photos, setPhotos] = useState([null, null, null, null, null]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categories, setCategories] = useState([]);
+  const [brands, setBrands] = useState([]);
+  const [error, setError] = useState("");
+  const [showValidation, setShowValidation] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/vehiclecategory/all");
+        const res = await fetch(`${BASE_URL}/api/vehiclecategory/all`);
         const data = await res.json();
         setCategories(data);
       } catch {
@@ -29,12 +32,43 @@ export default function SellBicycle() {
       }
     };
     fetchCategories();
+
+    // Fetch brands for Bicycles from vehiclemodelbrands table
+    const fetchBrands = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/api/vehiclemodelbrand/all`);
+        const data = await res.json();
+        // Filter brands for Bicycles category and remove duplicates
+        const bicycleBrands = Array.from(
+          new Set(
+            data
+              .filter((item) => item.category === "Bicycles")
+              .map((item) => item.brand)
+          )
+        );
+        setBrands(bicycleBrands);
+      } catch {
+        setBrands([]);
+      }
+    };
+    fetchBrands();
   }, []);
 
   const handlePhotoChange = (idx, file) => {
     const newPhotos = [...photos];
     newPhotos[idx] = file;
     setPhotos(newPhotos);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setShowValidation(true);
+    // Price must be a positive number
+    const priceValid = price && !isNaN(price) && Number(price) > 0;
+    if (!brand || !title || !description || !priceValid || !photos.some((p) => p)) {
+      return;
+    }
+    // ...submit code...
   };
 
   return (
@@ -107,19 +141,22 @@ export default function SellBicycle() {
           </div>
         </div>
       )}
-      <form className="space-y-4">
+      <form className="space-y-4" onSubmit={handleSubmit}>
         <div>
           <label className="block text-sm font-medium mb-1">Brand</label>
           <select
             value={brand}
             onChange={e => setBrand(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-2 w-full ${showValidation && !brand ? "border-red-500" : ""}`}
           >
             <option value="">Brand</option>
             {brands.map((b) => (
               <option key={b} value={b}>{b}</option>
             ))}
           </select>
+          {showValidation && !brand && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
         </div>
         <div className="flex gap-4 flex-wrap">
           {conditions.map((c) => (
@@ -142,20 +179,26 @@ export default function SellBicycle() {
             type="text"
             value={title}
             onChange={e => setTitle(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-2 w-full ${showValidation && !title ? "border-red-500" : ""}`}
             placeholder="Keep it short!"
           />
+          {showValidation && !title && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Description</label>
           <textarea
             value={description}
             onChange={e => setDescription(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-2 w-full ${showValidation && !description ? "border-red-500" : ""}`}
             rows={4}
             maxLength={5000}
             placeholder="More details = more interested buyers!"
           />
+          {showValidation && !description && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Price (Rs)</label>
@@ -163,9 +206,12 @@ export default function SellBicycle() {
             type="text"
             value={price}
             onChange={e => setPrice(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-2 w-full ${showValidation && (!price || isNaN(price) || Number(price) <= 0) ? "border-red-500" : ""}`}
             placeholder="Pick a good price"
           />
+          {showValidation && (!price || isNaN(price) || Number(price) <= 0) && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field with a valid price.</div>
+          )}
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -183,7 +229,11 @@ export default function SellBicycle() {
               <label
                 key={idx}
                 className={`flex flex-col items-center justify-center border-2 border-dashed rounded w-20 h-20 cursor-pointer ${
-                  photo ? "border-blue-600" : "border-gray-300"
+                  showValidation && !photos.some((p) => p)
+                    ? "border-red-500"
+                    : photo
+                    ? "border-blue-600"
+                    : "border-gray-300"
                 }`}
               >
                 <input
@@ -204,6 +254,21 @@ export default function SellBicycle() {
               </label>
             ))}
           </div>
+          {/* Only show error if no photo is present */}
+          {showValidation && !photos.some((p) => p) && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
+        </div>
+        {error && (
+          <div className="text-xs text-red-500 mt-2">{error}</div>
+        )}
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base"
+          >
+            Submit
+          </button>
         </div>
       </form>
     </div>

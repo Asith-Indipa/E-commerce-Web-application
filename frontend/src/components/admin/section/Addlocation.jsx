@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { BASE_URL } from "../../../util/api.js";
 
 const sriLankaDistricts = [
   "Colombo", "Gampaha", "Kalutara", "Kandy", "Matale", "Nuwara Eliya",
@@ -22,7 +23,7 @@ export default function Addlocation() {
   // Fetch locations from backend
   const fetchLocations = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/location/all");
+      const res = await fetch(`${BASE_URL}/api/location/all`);
       const data = await res.json();
       setLocations(data);
     } catch {
@@ -46,7 +47,7 @@ export default function Addlocation() {
       return;
     }
     try {
-      const res = await fetch("http://localhost:5000/api/location/add", {
+      const res = await fetch(`${BASE_URL}/api/location/add`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ district, subLocation }),
@@ -76,7 +77,7 @@ export default function Addlocation() {
     setError("");
     if (!editDistrict || !editSubLocation || !newSubLocation) return;
     try {
-      const res = await fetch("http://localhost:5000/api/location/update", {
+      const res = await fetch(`${BASE_URL}/api/location/update`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -108,7 +109,7 @@ export default function Addlocation() {
   const confirmDelete = async () => {
     setError("");
     try {
-      const res = await fetch("http://localhost:5000/api/location/delete", {
+      const res = await fetch(`${BASE_URL}/api/location/delete`, {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ district: deleteModal.district, subLocation: deleteModal.subLocation }),

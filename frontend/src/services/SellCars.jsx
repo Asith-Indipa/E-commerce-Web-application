@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { BASE_URL } from "../util/api.js"; // <-- If util is in project root util/api.jsrc/util/api.js
 
 const conditions = ["New", "Reconditioned", "Used"];
-const brands = ["Toyota", "Nissan", "Suzuki", "Honda", "Mazda"];
-const models = ["Model 1", "Model 2", "Model 3"];
 const fuelTypes = ["Diesel", "Petrol", "CNG", "Hybrid", "Electric", "Other Fuel type"];
 const transmissions = ["Manual", "Automatic", "Tiptronic", "Other transmission"];
 const bodyTypes = [
@@ -21,7 +20,9 @@ export default function SellCars() {
   const [category, setCategory] = useState("Cars");
   const [condition, setCondition] = useState("");
   const [brand, setBrand] = useState("");
+  const [brands, setBrands] = useState([]);
   const [model, setModel] = useState("");
+  const [models, setModels] = useState([]);
   const [trim, setTrim] = useState("");
   const [year, setYear] = useState("");
   const [mileage, setMileage] = useState("");
@@ -35,12 +36,13 @@ export default function SellCars() {
   const [photos, setPhotos] = useState([null, null, null, null, null]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categories, setCategories] = useState([]);
+  const [showValidation, setShowValidation] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/vehiclecategory/all");
+        const res = await fetch(`${BASE_URL}/api/vehiclecategory/all`);
         const data = await res.json();
         setCategories(data);
       } catch {
@@ -48,12 +50,82 @@ export default function SellCars() {
       }
     };
     fetchCategories();
+
+    // Fetch brands for Cars from vehiclemodelbrands table
+    const fetchBrands = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/api/vehiclemodelbrand/all`);
+        const data = await res.json();
+        // Filter brands for Cars category and remove duplicates
+        const carBrands = Array.from(
+          new Set(
+            data
+              .filter((item) => item.category === "Cars")
+              .map((item) => item.brand)
+          )
+        );
+        setBrands(carBrands);
+      } catch {
+        setBrands([]);
+      }
+    };
+    fetchBrands();
   }, []);
+
+  // Fetch models for selected brand
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/api/vehiclemodelbrand/all`);
+        const data = await res.json();
+        // Filter models for Cars category and selected brand, remove duplicates
+        const carModels = Array.from(
+          new Set(
+            data
+              .filter((item) => item.category === "Cars" && item.brand === brand)
+              .map((item) => item.model)
+          )
+        );
+        setModels(carModels);
+      } catch {
+        setModels([]);
+      }
+    };
+    if (brand) {
+      fetchModels();
+    } else {
+      setModels([]);
+    }
+  }, [brand]);
 
   const handlePhotoChange = (idx, file) => {
     const newPhotos = [...photos];
     newPhotos[idx] = file;
     setPhotos(newPhotos);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setShowValidation(true);
+    const priceValid = price && !isNaN(price) && Number(price) > 0;
+    const yearValid = year && !isNaN(year) && Number(year) >= 1886;
+    const mileageValid = mileage && !isNaN(mileage) && Number(mileage) >= 0;
+    const engineValid = engine && !isNaN(engine) && Number(engine) >= 1;
+    if (
+      !brand ||
+      !model ||
+      !yearValid ||
+      !mileageValid ||
+      !engineValid ||
+      !fuel ||
+      !transmission ||
+      !description ||
+      !priceValid ||
+      !photos.some((p) => p)
+    ) {
+      return;
+    }
+    // ...submit code...
   };
 
   return (
@@ -119,8 +191,8 @@ export default function SellCars() {
           </div>
         </div>
       )}
-      <form className="space-y-4">
-        <div className="flex gap-4 flex-wrap">
+      <form className="space-y-4" onSubmit={handleSubmit}>
+        <div className="flex flex-col gap-2 sm:flex-row sm:gap-4 flex-wrap">
           {conditions.map((c) => (
             <label key={c} className="flex items-center gap-1 text-sm">
               <input
@@ -135,104 +207,126 @@ export default function SellCars() {
             </label>
           ))}
         </div>
-        <div>
+        <div className="space-y-2">
           <label className="block text-sm font-medium mb-1">Brand</label>
           <select
             value={brand}
             onChange={e => setBrand(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-3 w-full min-w-0 block text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${showValidation && !brand ? "border-red-500" : ""}`}
           >
             <option value="">Brand</option>
             {brands.map((b) => (
               <option key={b} value={b}>{b}</option>
             ))}
           </select>
+          {!brand && showValidation && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
         </div>
-        <div>
+        <div className="space-y-2">
           <label className="block text-sm font-medium mb-1">Model</label>
           <select
             value={model}
             onChange={e => setModel(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-3 w-full min-w-0 block text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${showValidation && !model ? "border-red-500" : ""}`}
+            disabled={!brand}
           >
             <option value="">Model</option>
             {models.map((m) => (
               <option key={m} value={m}>{m}</option>
             ))}
           </select>
+          {!model && showValidation && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
         </div>
-        <div>
+        <div className="space-y-2">
           <label className="block text-sm font-medium mb-1">Trim / Edition (optional)</label>
           <input
             type="text"
             value={trim}
             onChange={e => setTrim(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className="border rounded px-3 py-3 w-full min-w-0 block text-base"
             placeholder="What is the trim/edition of your car?"
           />
         </div>
-        <div>
+        <div className="space-y-2">
           <label className="block text-sm font-medium mb-1">Year of Manufacture</label>
           <input
             type="text"
             value={year}
             onChange={e => setYear(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-3 w-full min-w-0 block text-base ${showValidation && (!year || isNaN(year) || Number(year) < 1886) ? "border-red-500" : ""}`}
             placeholder="When was your car manufactured?"
           />
+          {showValidation && (!year || isNaN(year) || Number(year) < 1886) && (
+            <div className="text-xs text-red-500 mt-1">Must be at least 1886</div>
+          )}
         </div>
-        <div>
+        <div className="space-y-2">
           <label className="block text-sm font-medium mb-1">Mileage (km)</label>
           <input
             type="text"
             value={mileage}
             onChange={e => setMileage(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-3 w-full min-w-0 block text-base ${showValidation && (!mileage || isNaN(mileage) || Number(mileage) < 0) ? "border-red-500" : ""}`}
             placeholder="What is the mileage of your car?"
           />
+          {showValidation && (!mileage || isNaN(mileage) || Number(mileage) < 0) && (
+            <div className="text-xs text-red-500 mt-1">Must be at least 0</div>
+          )}
         </div>
-        <div>
+        <div className="space-y-2">
           <label className="block text-sm font-medium mb-1">Engine capacity (cc)</label>
           <input
             type="text"
             value={engine}
             onChange={e => setEngine(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-3 w-full min-w-0 block text-base ${showValidation && (!engine || isNaN(engine) || Number(engine) < 1) ? "border-red-500" : ""}`}
             placeholder="What is the engine capacity of your car?"
           />
+          {showValidation && (!engine || isNaN(engine) || Number(engine) < 1) && (
+            <div className="text-xs text-red-500 mt-1">Must be at least 1</div>
+          )}
         </div>
-        <div>
+        <div className="space-y-2">
           <label className="block text-sm font-medium mb-1">Fuel type</label>
           <select
             value={fuel}
             onChange={e => setFuel(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-3 w-full min-w-0 block text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${showValidation && !fuel ? "border-red-500" : ""}`}
           >
             <option value="">Fuel type</option>
             {fuelTypes.map((f) => (
               <option key={f} value={f}>{f}</option>
             ))}
           </select>
+          {!fuel && showValidation && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
         </div>
-        <div>
+        <div className="space-y-2">
           <label className="block text-sm font-medium mb-1">Transmission</label>
           <select
             value={transmission}
             onChange={e => setTransmission(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-3 w-full min-w-0 block text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 ${showValidation && !transmission ? "border-red-500" : ""}`}
           >
             <option value="">Transmission</option>
             {transmissions.map((t) => (
               <option key={t} value={t}>{t}</option>
             ))}
           </select>
+          {!transmission && showValidation && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
         </div>
-        <div>
+        <div className="space-y-2">
           <label className="block text-sm font-medium mb-1">Body type (optional)</label>
           <select
             value={bodyType}
             onChange={e => setBodyType(e.target.value)}
-            className="border rounded px-3 py-2 w-full flex items-center"
+            className="border rounded px-3 py-3 w-full min-w-0 block text-base bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 flex items-center"
           >
             <option value="">Body type</option>
             {bodyTypes.map((b) => (
@@ -242,27 +336,33 @@ export default function SellCars() {
             ))}
           </select>
         </div>
-        <div>
+        <div className="space-y-2">
           <label className="block text-sm font-medium mb-1">Description</label>
           <textarea
             value={description}
             onChange={e => setDescription(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-3 w-full min-w-0 block text-base ${showValidation && !description ? "border-red-500" : ""}`}
             rows={4}
             maxLength={5000}
             placeholder="Describe the main features of your car"
           />
           <div className="text-xs text-gray-500 text-right mt-1">{description.length}/5000</div>
+          {showValidation && !description && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
         </div>
-        <div>
+        <div className="space-y-2">
           <label className="block text-sm font-medium mb-1">Price (Rs)</label>
           <input
             type="text"
             value={price}
             onChange={e => setPrice(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-3 w-full min-w-0 block text-base ${showValidation && (!price || isNaN(price) || Number(price) <= 0) ? "border-red-500" : ""}`}
             placeholder="How much do you want to sell your car for?"
           />
+          {showValidation && (!price || isNaN(price) || Number(price) <= 0) && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field with a valid price.</div>
+          )}
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -281,7 +381,11 @@ export default function SellCars() {
               <label
                 key={idx}
                 className={`flex flex-col items-center justify-center border-2 border-dashed rounded w-20 h-20 cursor-pointer ${
-                  photo ? "border-blue-600" : "border-gray-300"
+                  showValidation && !photos.some((p) => p)
+                    ? "border-red-500"
+                    : photo
+                    ? "border-blue-600"
+                    : "border-gray-300"
                 }`}
               >
                 <input
@@ -302,6 +406,17 @@ export default function SellCars() {
               </label>
             ))}
           </div>
+          {showValidation && !photos.some((p) => p) && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
+        </div>
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base"
+          >
+            Submit
+          </button>
         </div>
       </form>
     </div>

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { BASE_URL } from "../util/api.js";
 
 const conditions = ["Used", "Reconditioned", "New"];
 
@@ -14,12 +15,13 @@ export default function SellBoats() {
   const [photos, setPhotos] = useState([null, null, null, null, null]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categories, setCategories] = useState([]);
+  const [showValidation, setShowValidation] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/vehiclecategory/all");
+        const res = await fetch(`${BASE_URL}/api/vehiclecategory/all`);
         const data = await res.json();
         setCategories(data);
       } catch {
@@ -33,6 +35,16 @@ export default function SellBoats() {
     const newPhotos = [...photos];
     newPhotos[idx] = file;
     setPhotos(newPhotos);
+  };
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    setShowValidation(true);
+    const priceValid = price && !isNaN(price) && Number(price) > 0;
+    if (!title || !description || !priceValid || !photos.some((p) => p)) {
+      return;
+    }
+    // ...submit code...
   };
 
   return (
@@ -98,7 +110,7 @@ export default function SellBoats() {
           </div>
         </div>
       )}
-      <form className="space-y-4">
+      <form className="space-y-4" onSubmit={handleSubmit}>
         <div className="flex gap-4 flex-wrap">
           {conditions.map((c) => (
             <label key={c} className="flex items-center gap-1 text-sm">
@@ -120,20 +132,27 @@ export default function SellBoats() {
             type="text"
             value={title}
             onChange={e => setTitle(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-2 w-full ${showValidation && !title ? "border-red-500" : ""}`}
             placeholder="Keep it short!"
           />
+          {showValidation && !title && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Description</label>
           <textarea
             value={description}
             onChange={e => setDescription(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-2 w-full ${showValidation && !description ? "border-red-500" : ""}`}
             rows={4}
             maxLength={5000}
             placeholder="More details = more interested buyers!"
           />
+          <div className="text-xs text-gray-500 text-right mt-1">{description.length}/5000</div>
+          {showValidation && !description && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Price (Rs)</label>
@@ -141,9 +160,12 @@ export default function SellBoats() {
             type="text"
             value={price}
             onChange={e => setPrice(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-2 w-full ${showValidation && (!price || isNaN(price) || Number(price) <= 0) ? "border-red-500" : ""}`}
             placeholder="Pick a good price"
           />
+          {showValidation && (!price || isNaN(price) || Number(price) <= 0) && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field with a valid price.</div>
+          )}
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -156,13 +178,17 @@ export default function SellBoats() {
         </label>
         <hr className="my-6" />
         <div>
-          <div className="font-medium mb-2">Add up to 5 photos</div>
+          <div className="font-medium mb-2">Add up to 5 photos <span className="text-xs text-gray-500">(You must upload at least one photo)</span></div>
           <div className="flex gap-2 flex-wrap mb-1">
             {photos.map((photo, idx) => (
               <label
                 key={idx}
                 className={`flex flex-col items-center justify-center border-2 border-dashed rounded w-20 h-20 cursor-pointer ${
-                  photo ? "border-blue-600" : "border-gray-300"
+                  showValidation && !photos.some((p) => p)
+                    ? "border-red-500"
+                    : photo
+                    ? "border-blue-600"
+                    : "border-gray-300"
                 }`}
               >
                 <input
@@ -183,9 +209,17 @@ export default function SellBoats() {
               </label>
             ))}
           </div>
-          <div className="text-xs text-gray-500 mt-2">
-            You must upload at least one photo
-          </div>
+          {showValidation && !photos.some((p) => p) && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
+        </div>
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base"
+          >
+            Submit
+          </button>
         </div>
       </form>
     </div>
