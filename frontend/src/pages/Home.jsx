@@ -1,165 +1,141 @@
+import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Car, Bike, Truck, Bus, ArrowRight } from "lucide-react";
+import { BASE_URL } from "../util/api.js";
 
 export default function Home() {
-  // Sample featured vehicles data
-  const featuredVehicles = [
-    {
-      id: 1,
-      title: "Toyota Aqua 2015",
-      price: "Rs 4,500,000",
-      location: "Colombo",
-      image: "https://example.com/toyota-aqua.jpg" // Replace with actual image URL
-    },
-    {
-      id: 2,
-      title: "Honda Vezel 2017",
-      price: "Rs 6,800,000",
-      location: "Kandy",
-      image: "https://example.com/honda-vezel.jpg"
-    },
-    {
-      id: 3,
-      title: "Suzuki Wagon R 2018",
-      price: "Rs 3,200,000",
-      location: "Galle",
-      image: "https://example.com/suzuki-wagonr.jpg"
-    },
-    {
-      id: 4,
-      title: "Nissan Sunny 2016",
-      price: "Rs 3,900,000",
-      location: "Negombo",
-      image: "https://example.com/nissan-sunny.jpg"
-    }
-  ];
+  const [vehicles, setVehicles] = useState([]);
 
-  // Vehicle categories
+  useEffect(() => {
+    fetch(`${BASE_URL}/api/sellvehicle/all`)
+      .then(res => res.json())
+      .then(data => setVehicles(data))
+      .catch(() => setVehicles([]));
+  }, []);
+
   const categories = [
-    { name: "Cars", icon: <Car size={24} />, count: 1245 },
-    { name: "Motorcycles", icon: <Bike size={24} />, count: 876 },
-    { name: "Vans & Trucks", icon: <Truck size={24} />, count: 342 },
-    { name: "Buses", icon: <Bus size={24} />, count: 156 }
+    { name: "Auto Parts & Accessories", count: 30625 },
+    { name: "Motorbikes", count: 20613 },
+    { name: "Cars", count: 9649 },
+    { name: "Rentals", count: 6695 },
+    { name: "Auto Services", count: 5492 },
+    { name: "Three Wheelers", count: 3183 },
+    { name: "Bicycles", count: 1428 },
+    { name: "Lorries & Trucks", count: 867 },
+    { name: "Vans", count: 698 },
+    { name: "Heavy Duty", count: 193 },
+    { name: "Tractors", count: 187 },
+    { name: "Maintenance and Repair", count: 179 },
+    { name: "Boats & Water Transport", count: 50 }
   ];
 
   return (
-    <div className="pb-12">
-      {/* Hero Section */}
-      <section className="relative bg-blue-50 pt-24 pb-10 sm:pt-32 sm:pb-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center">
-            <h1 className="text-2xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-4">
-              Find Your Perfect Vehicle
-            </h1>
-            <p className="text-base sm:text-lg md:text-xl text-gray-600 max-w-2xl mx-auto">
-              Browse thousands of new and used vehicles for sale across Sri Lanka
-            </p>
+    <div className="bg-gray-50 min-h-screen">
+      <div className="max-w-7xl mx-auto px-2 sm:px-6 lg:px-8 py-6 flex flex-col md:flex-row gap-6">
+        {/* Sidebar */}
+        <aside className="w-full md:w-64 bg-white rounded-lg shadow p-4 mb-6 md:mb-0">
+          <div className="mb-4">
+            <div className="font-semibold text-gray-700 mb-2">Sort results by</div>
+            <select className="border rounded px-2 py-1 w-full text-sm">
+              <option>Date: Newest on top</option>
+              <option>Date: Oldest on top</option>
+            </select>
           </div>
-        </div>
-      </section>
-
-      {/* Categories Section */}
-      <section className="py-6 sm:py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-4 sm:mb-6">Browse by Category</h2>
-          <div className="grid grid-cols-1 xs:grid-cols-2 sm:grid-cols-4 gap-4">
-            {categories.map((category) => (
-              <Link
-                key={category.name}
-                to={`/vehicles?category=${category.name.toLowerCase()}`}
-                className="bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow border border-gray-100 flex items-center"
+          <div className="mb-4">
+            <label className="flex items-center gap-2 text-sm">
+              <input type="checkbox" className="accent-red-600" />
+              <span>URGENT</span>
+            </label>
+          </div>
+          <div className="mb-4">
+            <div className="font-semibold text-gray-700 mb-2">Type of poster</div>
+            <select className="border rounded px-2 py-1 w-full text-sm">
+              <option>All</option>
+              <option>Member</option>
+              <option>Dealer</option>
+            </select>
+          </div>
+          <div>
+            <div className="font-semibold text-gray-700 mb-2">Category</div>
+            <div className="text-blue-700 font-semibold mb-2">All Categories</div>
+            <div className="font-bold text-gray-700 mb-2">Vehicles</div>
+            <ul className="space-y-1">
+              {categories.map(cat => (
+                <li key={cat.name} className="flex justify-between text-sm text-gray-600">
+                  <span>{cat.name}</span>
+                  <span className="text-gray-400">({cat.count})</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </aside>
+        {/* Main Content */}
+        <main className="flex-1">
+          <div className="mb-4 text-sm text-gray-500">
+            Home &gt; All ads &gt; Vehicles
+          </div>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">
+            New and Used Vehicles for Sale in Sri Lanka
+          </h2>
+          <div className="text-xs text-gray-500 mb-4">
+            Showing {vehicles.length} ads
+          </div>
+          <div className="flex flex-col gap-4">
+            {vehicles.map((vehicle, idx) => (
+              <div
+                key={vehicle._id || idx}
+                className="border border-yellow-400 bg-white rounded-lg shadow hover:shadow-lg transition-shadow flex flex-row items-center p-3 sm:p-4 relative"
               >
-                <div className="p-2 bg-blue-100 rounded-full text-blue-600 mr-3">
-                  {category.icon}
+                {/* Image */}
+                <div className="w-32 h-24 sm:w-40 sm:h-32 flex-shrink-0 rounded overflow-hidden bg-gray-100 flex items-center justify-center">
+                  {vehicle.photos && vehicle.photos.length > 0 ? (
+                    <img
+                      src={`${BASE_URL}/sellvehicle/${vehicle.photos[0]}`}
+                      alt={vehicle.title}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <span className="text-gray-400 text-xs sm:text-base">No Image</span>
+                  )}
                 </div>
-                <div>
-                  <h3 className="font-medium text-gray-900 text-base sm:text-lg">{category.name}</h3>
-                  <p className="text-xs sm:text-sm text-gray-500">{category.count} listings</p>
+                {/* Info */}
+                <div className="flex-1 pl-4 flex flex-col justify-between h-full">
+                  <div className="flex items-center gap-2 mb-1">
+                    <h3 className="font-semibold text-base sm:text-lg text-gray-900">
+                      {vehicle.title}
+                    </h3>
+                    {vehicle.urgent && (
+                      <span className="bg-red-600 text-white text-xs px-2 py-1 rounded font-bold ml-2 absolute top-2 right-2">URGENT</span>
+                    )}
+                    {vehicle.featured && (
+                      <span className="bg-yellow-400 text-white text-xs px-2 py-1 rounded font-bold ml-2 absolute top-2 left-2">FEATURED</span>
+                    )}
+                    {vehicle.member && (
+                      <span className="bg-gray-200 text-gray-700 text-xs px-2 py-1 rounded font-bold ml-2">MEMBER</span>
+                    )}
+                  </div>
+                  {/* If you store mileage/location, show here */}
+                  {vehicle.mileage && (
+                    <div className="text-xs text-gray-500 mb-1">{vehicle.mileage}</div>
+                  )}
+                  {vehicle.location && (
+                    <div className="text-xs text-gray-500 mb-1">{vehicle.location}</div>
+                  )}
+                  <div className="text-green-600 font-bold text-sm sm:text-base mb-1">{vehicle.price}</div>
+                  <div className="text-xs text-gray-400 flex items-center gap-1">
+                    {vehicle.createdAt && (
+                      <span>{new Date(vehicle.createdAt).toLocaleString()}</span>
+                    )}
+                  </div>
                 </div>
-              </Link>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Featured Vehicles */}
-      <section className="py-6 sm:py-12 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col sm:flex-row justify-between items-center mb-4 sm:mb-6 gap-2">
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Featured Vehicles</h2>
-            <Link to="/vehicles" className="flex items-center text-blue-600 hover:text-blue-800 text-sm sm:text-base">
-              View all <ArrowRight size={18} className="ml-1" />
-            </Link>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-            {featuredVehicles.map((vehicle) => (
-              <div key={vehicle.id} className="bg-white rounded-lg overflow-hidden shadow-sm hover:shadow-md transition-shadow flex flex-col">
-                <div className="h-40 sm:h-48 bg-gray-200 flex items-center justify-center w-full">
-                  {/* Replace with actual image */}
-                  <span className="text-gray-400 text-xs sm:text-base">Vehicle Image</span>
-                </div>
-                <div className="p-3 sm:p-4 flex-1 flex flex-col justify-between">
-                  <h3 className="font-medium text-base sm:text-lg text-gray-900 mb-1">{vehicle.title}</h3>
-                  <p className="text-blue-600 font-semibold mb-1 sm:mb-2 text-sm sm:text-base">{vehicle.price}</p>
-                  <p className="text-xs sm:text-sm text-gray-500">{vehicle.location}</p>
+                {/* Pin icon bottom right */}
+                <div className="absolute bottom-2 right-2 text-pink-500 text-xl">
+                  <span role="img" aria-label="pin">📍</span>
                 </div>
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* Why Choose Us Section */}
-      <section className="py-6 sm:py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-6 sm:mb-8 text-center">Why Choose VehicleMart?</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8">
-            <div className="text-center">
-              <div className="bg-blue-100 w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-1 sm:mb-2">Verified Listings</h3>
-              <p className="text-gray-600 text-xs sm:text-base">All vehicles go through our verification process</p>
-            </div>
-            <div className="text-center">
-              <div className="bg-blue-100 w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              </div>
-              <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-1 sm:mb-2">Best Prices</h3>
-              <p className="text-gray-600 text-xs sm:text-base">We help you find the best deals in the market</p>
-            </div>
-            <div className="text-center">
-              <div className="bg-blue-100 w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                </svg>
-              </div>
-              <h3 className="text-base sm:text-lg font-medium text-gray-900 mb-1 sm:mb-2">24/7 Support</h3>
-              <p className="text-gray-600 text-xs sm:text-base">Our team is always ready to assist you</p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Call to Action */}
-      <section className="py-8 sm:py-12 bg-blue-600">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white mb-3 sm:mb-4">Ready to sell your vehicle?</h2>
-          <p className="text-blue-100 mb-4 sm:mb-6 max-w-2xl mx-auto text-xs sm:text-base">
-            List your vehicle with us and reach thousands of potential buyers
-          </p>
-          <Link
-            to="/sell"
-            className="inline-block bg-white text-blue-600 px-4 sm:px-6 py-2 sm:py-3 rounded-lg font-medium hover:bg-gray-100 transition text-sm sm:text-base"
-          >
-            Sell Your Vehicle Now
-          </Link>
-        </div>
-      </section>
+        </main>
+      </div>
     </div>
   );
 }

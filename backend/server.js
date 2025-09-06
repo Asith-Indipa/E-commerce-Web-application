@@ -15,6 +15,7 @@ mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
 const vehicleCategoryRoutes = require("./routes/vehiclecategory");
 const vehicleModelBrandRoutes = require("./routes/vehiclemodelbrand");
 const locationRoutes = require("./routes/location");
+const sellVehicleRoutes = require("./routes/sellvehicle"); // Add this line
 const cors = require("cors");
 
 // Middleware
@@ -29,6 +30,7 @@ app.get("/", (req, res) => {
 app.use("/api/vehiclecategory", vehicleCategoryRoutes);
 app.use("/api/vehiclemodelbrand", vehicleModelBrandRoutes);
 app.use("/api/location", locationRoutes);
+app.use("/api/sellvehicle", sellVehicleRoutes); // Add this line
 
 // Start server
 app.listen(PORT, () => {

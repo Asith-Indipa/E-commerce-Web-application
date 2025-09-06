@@ -20,6 +20,7 @@ export default function SellBicycle() {
   const [brands, setBrands] = useState([]);
   const [error, setError] = useState("");
   const [showValidation, setShowValidation] = useState(false);
+  const [success, setSuccess] = useState(""); // Add this state
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -61,15 +62,50 @@ export default function SellBicycle() {
     setPhotos(newPhotos);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setShowValidation(true);
-    // Price must be a positive number
+    setSuccess(""); // Reset success message
     const priceValid = price && !isNaN(price) && Number(price) > 0;
     if (!brand || !title || !description || !priceValid || !photos.some((p) => p)) {
       return;
     }
-    // ...submit code...
+    const formData = new FormData();
+    formData.append("brand", brand);
+    formData.append("title", title);
+    formData.append("description", description);
+    formData.append("price", price);
+    formData.append("negotiable", negotiable);
+    formData.append("location", location);   // Add this line
+    formData.append("category", category);   // Add this line
+    photos.forEach((photo) => {
+      if (photo) formData.append("photos", photo);
+    });
+    try {
+      const res = await fetch(`${BASE_URL}/api/sellvehicle/add`, {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccess("Post your Ad successfully");
+        setShowValidation(false);
+        // Reset all fields
+        setBrand("");
+        setCondition("Used");
+        setTitle("");
+        setDescription("");
+        setPrice("");
+        setNegotiable(false);
+        setPhotos([null, null, null, null, null]);
+        setError("");
+        setTimeout(() => setSuccess(""), 3000); // Hide after 3 seconds
+      } else {
+        setError(data.error || "Failed to save vehicle details");
+      }
+    } catch (err) {
+      setError("Network error");
+    }
   };
 
   return (
@@ -143,6 +179,16 @@ export default function SellBicycle() {
         </div>
       )}
       <form className="space-y-4" onSubmit={handleSubmit}>
+        {/* Attractive notification sliding from right, mobile responsive */}
+        {success && (
+          <div className="fixed top-6 right-4 sm:right-8 z-50 bg-blue-600 text-white px-5 py-3 rounded-lg shadow-lg font-semibold text-base transition-all animate-slide-in w-[90vw] max-w-xs sm:max-w-sm"
+            style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.15)" }}>
+            <span role="alert">✅ {success}</span>
+          </div>
+        )}
+        {success && (
+          <div className="text-green-600 text-sm mb-2">{success}</div>
+        )}
         <div>
           <label className="block text-sm font-medium mb-1">Brand</label>
           <Select
@@ -274,3 +320,13 @@ export default function SellBicycle() {
     </div>
   );
 }
+
+// Add this CSS to your global styles or index.css for animation:
+//
+// .animate-slide-in {
+//   animation: slideInRight 0.5s;
+// }
+// @keyframes slideInRight {
+//   from { opacity: 0; transform: translateX(100px); }
+//   to { opacity: 1; transform: translateX(0); }
+// }
