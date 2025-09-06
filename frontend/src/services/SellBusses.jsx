@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { BASE_URL } from "../util/api.js";
+import Select from "react-select"; // Add this import
 
 const conditions = ["Used", "Reconditioned", "New"];
 
@@ -178,33 +179,31 @@ export default function SellBusses() {
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div>
           <label className="block text-sm font-medium mb-1">Brand</label>
-          <select
-            value={brand}
-            onChange={e => setBrand(e.target.value)}
-            className={`border rounded px-3 py-2 w-full ${showValidation && !brand ? "border-red-500" : ""}`}
-          >
-            <option value="">Brand</option>
-            {brands.map((b) => (
-              <option key={b} value={b}>{b}</option>
-            ))}
-          </select>
+          <Select
+            options={brands.map(b => ({ value: b, label: b }))}
+            value={brand ? { value: brand, label: brand } : null}
+            onChange={option => setBrand(option ? option.value : "")}
+            isClearable
+            placeholder="Brand"
+            classNamePrefix="react-select"
+            className={showValidation && !brand ? "border-red-500" : ""}
+          />
           {showValidation && !brand && (
             <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
           )}
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Model</label>
-          <select
-            value={model}
-            onChange={e => setModel(e.target.value)}
-            className={`border rounded px-3 py-2 w-full ${showValidation && !model ? "border-red-500" : ""}`}
-            disabled={!brand}
-          >
-            <option value="">Model</option>
-            {models.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
+          <Select
+            options={models.map(m => ({ value: m, label: m }))}
+            value={model ? { value: model, label: model } : null}
+            onChange={option => setModel(option ? option.value : "")}
+            isClearable
+            isDisabled={!brand}
+            placeholder="Model"
+            classNamePrefix="react-select"
+            className={showValidation && !model ? "border-red-500" : ""}
+          />
           {showValidation && !model && (
             <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
           )}
