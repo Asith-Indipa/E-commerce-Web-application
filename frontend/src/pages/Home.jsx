@@ -87,11 +87,12 @@ export default function Home() {
               >
                 {/* Image */}
                 <div className="w-32 h-24 sm:w-40 sm:h-32 flex-shrink-0 rounded overflow-hidden bg-gray-100 flex items-center justify-center">
-                  {vehicle.photos && vehicle.photos.length > 0 ? (
+                  {vehicle.photos && vehicle.photos.length > 0 && vehicle.photos[0] ? (
                     <img
                       src={`${BASE_URL}/sellvehicle/${vehicle.photos[0]}`}
                       alt={vehicle.title}
                       className="w-full h-full object-cover"
+                      onError={e => { e.target.src = "/no-image.png"; }}
                     />
                   ) : (
                     <span className="text-gray-400 text-xs sm:text-base">No Image</span>

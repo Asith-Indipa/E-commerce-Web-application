@@ -3,6 +3,7 @@ const router = express.Router();
 const mongoose = require("mongoose");
 const multer = require("multer");
 const path = require("path");
+const fs = require("fs");
 
 // Multer config
 const storage = multer.diskStorage({
@@ -60,6 +61,29 @@ router.get("/all", async (req, res) => {
   try {
     const vehicles = await SellVehicleDetails.find().sort({ createdAt: -1 });
     res.json(vehicles);
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE endpoint to remove a vehicle and its images
+router.delete("/delete/:id", async (req, res) => {
+  try {
+    const vehicle = await SellVehicleDetails.findById(req.params.id);
+    if (!vehicle) return res.status(404).json({ success: false, error: "Vehicle not found" });
+
+    // Delete images from local folder
+    if (vehicle.photos && vehicle.photos.length > 0) {
+      vehicle.photos.forEach(filename => {
+        const filePath = path.join(__dirname, "../sellvehicle", filename);
+        fs.unlink(filePath, err => {
+          // Ignore errors if file doesn't exist
+        });
+      });
+    }
+
+    await vehicle.deleteOne();
+    res.json({ success: true, message: "Vehicle and images deleted" });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }

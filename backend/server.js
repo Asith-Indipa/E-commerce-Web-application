@@ -22,6 +22,9 @@ const cors = require("cors");
 app.use(cors()); // <-- Add this line before your routes
 app.use(express.json());
 
+// Serve uploaded vehicle images
+app.use("/sellvehicle", express.static("sellvehicle"));
+
 // Example route
 app.get("/", (req, res) => {
   res.send("Hello from Express backend 🚀");
