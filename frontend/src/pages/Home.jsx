@@ -12,6 +12,12 @@ export default function Home() {
       .catch(() => setVehicles([]));
   }, []);
 
+  // Helper to format number with commas
+  function formatNumberWithCommas(num) {
+    if (!num && num !== 0) return "";
+    return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
   const categories = [
     { name: "Auto Parts & Accessories", count: 30625 },
     { name: "Motorbikes", count: 20613 },
@@ -116,12 +122,29 @@ export default function Home() {
                   </div>
                   {/* If you store mileage/location, show here */}
                   {vehicle.mileage && (
-                    <div className="text-xs text-gray-500 mb-1">{vehicle.mileage}</div>
+                    <div className="text-xs text-gray-500 mb-1">
+                      {(() => {
+                        // Extract numeric part and unit (e.g., "12345km")
+                        const match = String(vehicle.mileage).match(/^(\d+)(km)?$/i);
+                        if (match) {
+                          const num = match[1];
+                          return `${formatNumberWithCommas(num)} km`;
+                        }
+                        // If already formatted or has other text, show as is
+                        return vehicle.mileage;
+                      })()}
+                    </div>
                   )}
-                  {vehicle.location && (
-                    <div className="text-xs text-gray-500 mb-1">{vehicle.location}</div>
+                  {/* Show district and subLocation */}
+                  {(vehicle.district || vehicle.subLocation) && (
+                    <div className="text-xs text-gray-500 mb-1">
+                      {vehicle.district}
+                      {vehicle.subLocation ? `, ${vehicle.subLocation}` : ""}
+                    </div>
                   )}
-                  <div className="text-green-600 font-bold text-sm sm:text-base mb-1">{vehicle.price}</div>
+                  <div className="text-green-600 font-bold text-sm sm:text-base mb-1">
+                    {vehicle.price ? `Rs ${formatNumberWithCommas(vehicle.price)}` : ""}
+                  </div>
                   <div className="text-xs text-gray-400 flex items-center gap-1">
                     {vehicle.createdAt && (
                       <span>{new Date(vehicle.createdAt).toLocaleString()}</span>

@@ -1,15 +1,31 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import Select from "react-select";
 
 const bikeTypes = [
-  "E-bikes",
-  "Motorbikes",
-  "Quadricycles",
-  "Scooters"
+  { value: "E-bikes", label: "E-bikes" },
+  { value: "Motorbikes", label: "Motorbikes" },
+  { value: "Quadricycles", label: "Quadricycles" },
+  { value: "Scooters", label: "Scooters" }
 ];
 const conditions = ["Used", "Reconditioned", "New"];
 const brands = ["Brand 1", "Brand 2", "Brand 3"];
 const models = ["Model 1", "Model 2", "Model 3"];
+
+const selectStyles = {
+  menuPortal: base => ({ ...base, zIndex: 9999 }),
+  menu: base => ({ ...base, zIndex: 9999 }),
+  control: base => ({
+    ...base,
+    minHeight: 44,
+    fontSize: "1rem",
+    width: "100%"
+  }),
+  option: base => ({
+    ...base,
+    fontSize: "1rem"
+  })
+};
 
 export default function SellMotorbicycle() {
   const [location, setLocation] = useState("Kamburupitiya");
@@ -115,16 +131,16 @@ export default function SellMotorbicycle() {
       <form className="space-y-4">
         <div>
           <label className="block text-sm font-medium mb-1">Bike Type</label>
-          <select
-            value={bikeType}
-            onChange={e => setBikeType(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
-          >
-            <option value="">Bike Type</option>
-            {bikeTypes.map((b) => (
-              <option key={b} value={b}>{b}</option>
-            ))}
-          </select>
+          <Select
+            options={bikeTypes}
+            value={bikeType ? { value: bikeType, label: bikeType } : null}
+            onChange={option => setBikeType(option ? option.value : "")}
+            isClearable
+            placeholder="Bike Type"
+            classNamePrefix="react-select"
+            menuPortalTarget={typeof window !== "undefined" ? document.body : null}
+            styles={selectStyles}
+          />
         </div>
         <div className="flex gap-4 flex-wrap">
           {conditions.map((c) => (
@@ -143,29 +159,30 @@ export default function SellMotorbicycle() {
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Brand</label>
-          <select
-            value={brand}
-            onChange={e => setBrand(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
-          >
-            <option value="">Brand</option>
-            {brands.map((b) => (
-              <option key={b} value={b}>{b}</option>
-            ))}
-          </select>
+          <Select
+            options={brands.map(b => ({ value: b, label: b }))}
+            value={brand ? { value: brand, label: brand } : null}
+            onChange={option => setBrand(option ? option.value : "")}
+            isClearable
+            placeholder="Brand"
+            classNamePrefix="react-select"
+            menuPortalTarget={typeof window !== "undefined" ? document.body : null}
+            styles={selectStyles}
+          />
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Model</label>
-          <select
-            value={model}
-            onChange={e => setModel(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
-          >
-            <option value="">Model</option>
-            {models.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
+          <Select
+            options={models.map(m => ({ value: m, label: m }))}
+            value={model ? { value: model, label: model } : null}
+            onChange={option => setModel(option ? option.value : "")}
+            isClearable
+            isDisabled={!brand}
+            placeholder="Model"
+            classNamePrefix="react-select"
+            menuPortalTarget={typeof window !== "undefined" ? document.body : null}
+            styles={selectStyles}
+          />
         </div>
         <input
           type="text"

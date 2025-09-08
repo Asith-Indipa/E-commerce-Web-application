@@ -4,6 +4,12 @@ import { BASE_URL } from "../util/api.js";
 
 const conditions = ["Used", "Reconditioned", "New"];
 
+// Helper to format number with commas
+function formatNumberWithCommas(num) {
+  if (!num) return "";
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
 export default function SellBoats() {
   const [location, setLocation] = useState("Kamburupitiya");
   const [category, setCategory] = useState("Boats & Water Transport");
@@ -16,6 +22,13 @@ export default function SellBoats() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categories, setCategories] = useState([]);
   const [showValidation, setShowValidation] = useState(false);
+  const [success, setSuccess] = useState("");
+  const [error, setError] = useState("");
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [locations, setLocations] = useState([]);
+  const [selectedDistrict, setSelectedDistrict] = useState(null);
+  const [district, setDistrict] = useState("");
+  const [subLocation, setSubLocation] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -29,6 +42,21 @@ export default function SellBoats() {
       }
     };
     fetchCategories();
+
+    const fetchLocations = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/api/location/all`);
+        const data = await res.json();
+        const arr = Object.entries(data).map(([district, sublocations]) => ({
+          district,
+          sublocations
+        }));
+        setLocations(arr);
+      } catch {
+        setLocations([]);
+      }
+    };
+    fetchLocations();
   }, []);
 
   const handlePhotoChange = (idx, file) => {
@@ -37,23 +65,76 @@ export default function SellBoats() {
     setPhotos(newPhotos);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setShowValidation(true);
+    setSuccess("");
     const priceValid = price && !isNaN(price) && Number(price) > 0;
     if (!title || !description || !priceValid || !photos.some((p) => p)) {
       return;
     }
-    // ...submit code...
+    const formData = new FormData();
+    formData.append("title", title);
+    formData.append("description", description);
+    formData.append("price", price);
+    formData.append("negotiable", negotiable);
+    formData.append("condition", condition);
+    formData.append("location", location);
+    formData.append("category", category);
+    formData.append("district", district);
+    formData.append("subLocation", subLocation);
+    photos.forEach((photo) => {
+      if (photo) formData.append("photos", photo);
+    });
+    try {
+      const res = await fetch(`${BASE_URL}/api/sellvehicle/add`, {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccess("✅ Post your Ad successfully!");
+        setShowValidation(false);
+        setTitle("");
+        setDescription("");
+        setPrice("");
+        setNegotiable(false);
+        setPhotos([null, null, null, null, null]);
+        setError("");
+        setCondition("Used");
+        setDistrict("");
+        setSubLocation("");
+        setTimeout(() => {
+          setSuccess("");
+          navigate("/");
+        }, 2000); // Show alert for 2 seconds, then redirect
+      } else {
+        setError(data.error || "Failed to save vehicle details");
+      }
+    } catch (err) {
+      setError("Network error");
+    }
   };
 
   return (
     <div className="max-w-2xl mx-auto px-2 sm:px-4 py-6 sm:py-8">
+      {/* Attractive notification sliding from right, mobile responsive */}
+      {success && (
+        <div className="fixed top-6 right-4 sm:right-8 z-50 bg-blue-600 text-white px-5 py-3 rounded-lg shadow-lg font-semibold text-base transition-all animate-slide-in w-[90vw] max-w-xs sm:max-w-sm"
+          style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.15)" }}>
+          <span role="alert">{success}</span>
+        </div>
+      )}
       <h1 className="text-xl sm:text-2xl font-bold mb-4">Fill in the details</h1>
       <div className="flex flex-col sm:flex-row gap-2 mb-4 items-center">
         <div className="flex items-center gap-2">
           <span className="text-green-700 font-semibold">{location}</span>
-          <button className="text-blue-600 underline text-xs">Change</button>
+          <button
+            className="text-blue-600 underline text-xs"
+            onClick={() => setShowLocationModal(true)}
+          >
+            Change
+          </button>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-green-700 font-semibold">{category}</span>
@@ -65,6 +146,73 @@ export default function SellBoats() {
           </button>
         </div>
       </div>
+      {/* Location Change Modal */}
+      {showLocationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-3xl mx-auto flex flex-col sm:flex-row gap-0">
+            <div className="w-full sm:w-1/2 border-r pr-4">
+              <h4 className="text-lg font-semibold mb-2 text-blue-700">Select City or Division</h4>
+              <ul className="space-y-1">
+                {locations.map(loc => (
+                  <li key={loc.district}>
+                    <button
+                      className={`w-full text-left px-2 py-2 rounded hover:bg-blue-50 font-semibold text-blue-700 transition-all flex justify-between items-center ${
+                        selectedDistrict === loc.district ? "bg-blue-100" : ""
+                      }`}
+                      onClick={() => {
+                        setSelectedDistrict(loc.district);
+                        setDistrict(loc.district);
+                      }}
+                    >
+                      <span>{loc.district}</span>
+                      <span className="text-gray-400">{'>'}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <div className="w-full sm:w-1/2 pl-4">
+              <h4 className="text-lg font-semibold mb-2 text-blue-700">
+                {selectedDistrict
+                  ? `Select a local area within ${selectedDistrict}`
+                  : "Select a local area"}
+              </h4>
+              {selectedDistrict ? (
+                <>
+                  <div className="mb-2 font-semibold text-gray-700">Popular areas</div>
+                  <ul className="space-y-1 mb-4">
+                    {locations
+                      .find(loc => loc.district === selectedDistrict)
+                      ?.sublocations?.map(sub => (
+                        <li key={sub}>
+                          <button
+                            className="w-full text-left px-2 py-2 rounded hover:bg-green-50 font-semibold text-green-700 transition-all"
+                            onClick={() => {
+                              setSubLocation(sub);
+                              setLocation(`${selectedDistrict}, ${sub}`);
+                              setShowLocationModal(false);
+                              setSelectedDistrict(null);
+                            }}
+                          >
+                            {sub}
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                </>
+              ) : (
+                <div className="text-gray-500 text-sm">Select a district to see areas</div>
+              )}
+              <button
+                onClick={() => setShowLocationModal(false)}
+                className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 transition-all font-semibold mt-4"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Category Change Modal */}
       {showCategoryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
@@ -156,13 +304,20 @@ export default function SellBoats() {
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Price (Rs)</label>
-          <input
-            type="text"
-            value={price}
-            onChange={e => setPrice(e.target.value)}
-            className={`border rounded px-3 py-2 w-full ${showValidation && (!price || isNaN(price) || Number(price) <= 0) ? "border-red-500" : ""}`}
-            placeholder="Pick a good price"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={formatNumberWithCommas(price)}
+              onChange={e => {
+                // Remove commas and non-numeric chars before storing
+                const raw = e.target.value.replace(/,/g, "").replace(/[^0-9]/g, "");
+                setPrice(raw);
+              }}
+              className={`border rounded px-3 py-2 w-full pr-10 ${showValidation && (!price || isNaN(price) || Number(price) <= 0) ? "border-red-500" : ""}`}
+              placeholder="Pick a good price"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">Rs</span>
+          </div>
           {showValidation && (!price || isNaN(price) || Number(price) <= 0) && (
             <div className="text-xs text-red-500 mt-1">You must fill out this field with a valid price.</div>
           )}
@@ -225,3 +380,13 @@ export default function SellBoats() {
     </div>
   );
 }
+
+// Add this CSS to your global styles or index.css for animation:
+//
+// .animate-slide-in {
+//   animation: slideInRight 0.5s;
+// }
+// @keyframes slideInRight {
+//   from { opacity: 0; transform: translateX(100px); }
+//   to { opacity: 1; transform: translateX(0); }
+// }

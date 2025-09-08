@@ -6,19 +6,12 @@ const conditions = ["Used", "Reconditioned", "New"];
 const brands = ["Brand 1", "Brand 2", "Brand 3"];
 const models = ["Model 1", "Model 2", "Model 3"];
 const vehicleTypes = [
-  "Industrial Tractors",
-  "Loader",
-  "Other",
-  "Prime Mover",
-  "Road Roller",
-  "Excavator",
-  "Forklift",
-  "Harvester",
-  "Bed Trailer",
-  "Bowser",
-  "Bulldozer",
-  "Crane",
-  "Dump truck"
+  { value: "Excavator", label: "Excavator" },
+  { value: "Bulldozer", label: "Bulldozer" },
+  { value: "Crane", label: "Crane" },
+  { value: "Forklift", label: "Forklift" },
+  { value: "Loader", label: "Loader" },
+  { value: "Other", label: "Other" }
 ];
 export default function SellHeavyDuty() {
   const [location, setLocation] = useState("Kamburupitiya");
@@ -207,19 +200,18 @@ export default function SellHeavyDuty() {
             ))}
           </div>
         </div>
-        <div>
+        <div className="space-y-2">
           <label className="block text-sm font-medium mb-1">Vehicle Type</label>
-          <select
-            value={vehicleType}
-            onChange={e => setVehicleType(e.target.value)}
-            className={`border rounded px-3 py-2 w-full ${showValidation && !vehicleType ? "border-red-500" : ""}`}
-          >
-            <option value="">Vehicle Type</option>
-            {vehicleTypes.map((v) => (
-              <option key={v} value={v}>{v}</option>
-            ))}
-          </select>
-          {showValidation && !vehicleType && (
+          <Select
+            options={vehicleTypes}
+            value={vehicleType ? { value: vehicleType, label: vehicleType } : null}
+            onChange={option => setVehicleType(option ? option.value : "")}
+            isClearable
+            placeholder="Select vehicle type"
+            classNamePrefix="react-select"
+            className={showValidation && !vehicleType ? "border-red-500" : ""}
+          />
+          {!vehicleType && showValidation && (
             <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
           )}
         </div>

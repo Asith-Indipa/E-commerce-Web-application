@@ -19,13 +19,22 @@ const upload = multer({ storage });
 // Define schema
 const sellVehicleSchema = new mongoose.Schema({
   brand: String,
-  title: String,
+  model: String,         // Add this field
+  trim: String,          // Add this field
+  condition: String,
+  year: String,          // Add this field
+  mileage: String,       // Add this field
+  engine: String,        // Add this field
+  fuel: String,           // Add this field
+  transmission: String,   // Add this field
+  bodyType: String,       // Add this field
   description: String,
   price: Number,
   photos: [String], // You can use [String] for file names or base64 strings
-  negotiable: Boolean, // <-- Add this field
-  location: String,      // Add this field
-  category: String,      // Add this field
+  negotiable: Boolean,
+  category: String,
+  district: String,
+  subLocation: String,
   createdAt: { type: Date, default: Date.now }
 });
 
@@ -35,18 +44,48 @@ const SellVehicleDetails = mongoose.model("SellVehicleDetails", sellVehicleSchem
 // POST endpoint to add a vehicle with image upload
 router.post("/add", upload.array("photos", 5), async (req, res) => {
   try {
-    const { brand, title, description, price, negotiable, location, category } = req.body;
-    const photoFiles = req.files || [];
-    const photoPaths = photoFiles.map(file => file.filename);
-    const vehicle = new SellVehicleDetails({
+    console.log("Received body:", req.body); // Debug: log incoming fields
+    console.log("Received files:", req.files); // Debug: log incoming files
+    const {
       brand,
-      title,
+      model,
+      trim,
+      condition,
+      year,
+      mileage,
+      engine,
+      fuel,           // Add this field
+      transmission,   // Add this field
+      bodyType,       // Add this field
       description,
       price,
+      negotiable,
+      category,
+      district,
+      subLocation
+    } = req.body;
+    const photoFiles = req.files || [];
+    const photoPaths = photoFiles.map(file => file.filename);
+    // Convert price to number (remove commas if present)
+    const numericPrice = typeof price === "string" ? Number(price.replace(/,/g, "")) : price;
+    const vehicle = new SellVehicleDetails({
+      brand,
+      model,
+      trim,
+      condition,
+      year,
+      mileage,
+      engine,
+      fuel,           // Add this field
+      transmission,   // Add this field
+      bodyType,       // Add this field
+      description,
+      price: numericPrice,
       photos: photoPaths,
       negotiable,
-      location,
-      category
+      category,
+      district,
+      subLocation
     });
     await vehicle.save();
     res.status(201).json({ success: true, vehicle });
