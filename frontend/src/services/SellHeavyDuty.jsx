@@ -3,19 +3,33 @@ import { useNavigate } from "react-router-dom";
 import Select from "react-select"; // Add this import
 
 const conditions = ["Used", "Reconditioned", "New"];
-const brands = ["Brand 1", "Brand 2", "Brand 3"];
-const models = ["Model 1", "Model 2", "Model 3"];
 const vehicleTypes = [
-  { value: "Excavator", label: "Excavator" },
-  { value: "Bulldozer", label: "Bulldozer" },
-  { value: "Crane", label: "Crane" },
-  { value: "Forklift", label: "Forklift" },
-  { value: "Loader", label: "Loader" },
-  { value: "Other", label: "Other" }
+  "Industrial Tractors",
+  "Loader",
+  "Other",
+  "Prime Mover",
+  "Road Roller",
+  "Excavator",
+  "Forklift",
+  "Harvester",
+  "Bed Trailer",
+  "Bowser",
+  "Bulldozer",
+  "Crane",
+  "Dump truck"
 ];
+
+// Helper to format number with commas
+function formatNumberWithCommas(num) {
+  if (!num) return "";
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
 export default function SellHeavyDuty() {
   const [location, setLocation] = useState("Kamburupitiya");
   const [category, setCategory] = useState("Heavy Duty");
+  const [brands, setBrands] = useState([]);
+  const [models, setModels] = useState([]);
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState("");
   const [trim, setTrim] = useState("");
@@ -26,10 +40,18 @@ export default function SellHeavyDuty() {
   const [price, setPrice] = useState("");
   const [negotiable, setNegotiable] = useState(false);
   const [year, setYear] = useState("");
+  const [mileage, setMileage] = useState(""); // Add mileage state
+  const [engine, setEngine] = useState(""); // Add engine state
   const [photos, setPhotos] = useState([null, null, null, null, null]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categories, setCategories] = useState([]);
   const [showValidation, setShowValidation] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [locations, setLocations] = useState([]);
+  const [selectedDistrict, setSelectedDistrict] = useState(null);
+  const [district, setDistrict] = useState("");
+  const [subLocation, setSubLocation] = useState("");
+  const [success, setSuccess] = useState(""); // Add this state
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -45,15 +67,81 @@ export default function SellHeavyDuty() {
     fetchCategories();
   }, []);
 
+  useEffect(() => {
+    // Fetch brands for Heavy Duty from vehiclemodelbrands table
+    const fetchBrands = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/vehiclemodelbrand/all");
+        const data = await res.json();
+        // Filter brands for Heavy Duty category and remove duplicates
+        const heavyBrands = Array.from(
+          new Set(
+            data
+              .filter((item) => item.category === "Heavy Duty")
+              .map((item) => item.brand)
+          )
+        );
+        setBrands(heavyBrands);
+      } catch {
+        setBrands([]);
+      }
+    };
+    fetchBrands();
+  }, []);
+
+  useEffect(() => {
+    // Fetch models for selected brand in Heavy Duty category
+    const fetchModels = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/vehiclemodelbrand/all");
+        const data = await res.json();
+        const heavyModels = Array.from(
+          new Set(
+            data
+              .filter((item) => item.category === "Heavy Duty" && item.brand === brand)
+              .map((item) => item.model)
+          )
+        );
+        setModels(heavyModels);
+      } catch {
+        setModels([]);
+      }
+    };
+    if (brand) {
+      fetchModels();
+    } else {
+      setModels([]);
+    }
+  }, [brand]);
+
+  useEffect(() => {
+    // Fetch locations from backend
+    const fetchLocations = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/location/all");
+        const data = await res.json();
+        const arr = Object.entries(data).map(([district, sublocations]) => ({
+          district,
+          sublocations
+        }));
+        setLocations(arr);
+      } catch {
+        setLocations([]);
+      }
+    };
+    fetchLocations();
+  }, []);
+
   const handlePhotoChange = (idx, file) => {
     const newPhotos = [...photos];
     newPhotos[idx] = file;
     setPhotos(newPhotos);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setShowValidation(true);
+    setSuccess("");
     const priceValid = price && !isNaN(price) && Number(price) > 0;
     const yearValid = year && !isNaN(year) && Number(year) >= 1900;
     const mileageValid = mileage && !isNaN(mileage) && Number(mileage) >= 0;
@@ -61,29 +149,85 @@ export default function SellHeavyDuty() {
     if (
       !brand ||
       !model ||
-      !vehicleType ||
-      !title ||
+      !vehicleType || // Vehicle Type required
+      !title ||           // Title required
+      !description ||     // Description required
       !yearValid ||
       !mileageValid ||
       !engineValid ||
-      !fuel ||
-      !transmission ||
-      !description ||
       !priceValid ||
       !photos.some((p) => p)
     ) {
       return;
     }
-    // ...submit code...
+    const formData = new FormData();
+    formData.append("brand", brand);
+    formData.append("model", model);
+    formData.append("trim", trim);
+    formData.append("condition", condition);
+    formData.append("vehicleType", vehicleType); // Add Vehicle Type to formData
+    formData.append("title", title);           // Add Title to formData
+    formData.append("description", description); // Add Description to formData
+    formData.append("year", year);
+    formData.append("mileage", mileage + "km");
+    formData.append("engine", engine + "cc");
+    formData.append("price", price);
+    formData.append("negotiable", negotiable);
+    formData.append("category", category);
+    formData.append("location", location);
+    formData.append("district", location.split(",")[0]);
+    formData.append("subLocation", location.split(",")[1] ? location.split(",")[1].trim() : "");
+    photos.forEach((photo) => {
+      if (photo) formData.append("photos", photo);
+    });
+    try {
+      const res = await fetch("http://localhost:5000/api/sellvehicle/add", {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccess("✅ Post your Ad successfully!");
+        setShowValidation(false);
+        setBrand("");
+        setModel("");
+        setTrim("");
+        setCondition("Used");
+        setYear("");
+        setMileage("");
+        setEngine("");
+        setPrice("");
+        setNegotiable(false);
+        setPhotos([null, null, null, null, null]);
+        setTimeout(() => {
+          setSuccess("");
+          navigate("/");
+        }, 2000); // Show alert for 2 seconds, then redirect
+      }
+    } catch (err) {
+      // Optionally show error message
+    }
   };
 
   return (
     <div className="max-w-2xl mx-auto px-2 sm:px-4 py-6 sm:py-8">
+      {/* Attractive notification sliding from right, mobile responsive */}
+      {success && (
+        <div className="fixed top-6 right-4 sm:right-8 z-50 bg-blue-600 text-white px-5 py-3 rounded-lg shadow-lg font-semibold text-base transition-all animate-slide-in w-[90vw] max-w-xs sm:max-w-sm"
+          style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.15)" }}>
+          <span role="alert">{success}</span>
+        </div>
+      )}
       <h1 className="text-xl sm:text-2xl font-bold mb-4">Fill in the details</h1>
       <div className="flex flex-col sm:flex-row gap-2 mb-4 items-center">
         <div className="flex items-center gap-2">
           <span className="text-green-700 font-semibold">{location}</span>
-          <button className="text-blue-600 underline text-xs">Change</button>
+          <button
+            className="text-blue-600 underline text-xs"
+            onClick={() => setShowLocationModal(true)}
+          >
+            Change
+          </button>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-green-700 font-semibold">{category}</span>
@@ -95,6 +239,75 @@ export default function SellHeavyDuty() {
           </button>
         </div>
       </div>
+      {/* Location Change Modal */}
+      {showLocationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-3xl mx-auto flex flex-col sm:flex-row gap-0">
+            {/* Left: Districts */}
+            <div className="w-full sm:w-1/2 border-r pr-4">
+              <h4 className="text-lg font-semibold mb-2 text-blue-700">Select City or Division</h4>
+              <ul className="space-y-1">
+                {locations.map(loc => (
+                  <li key={loc.district}>
+                    <button
+                      className={`w-full text-left px-2 py-2 rounded hover:bg-blue-50 font-semibold text-blue-700 transition-all flex justify-between items-center ${
+                        selectedDistrict === loc.district ? "bg-blue-100" : ""
+                      }`}
+                      onClick={() => {
+                        setSelectedDistrict(loc.district);
+                        setDistrict(loc.district);
+                      }}
+                    >
+                      <span>{loc.district}</span>
+                      <span className="text-gray-400">{'>'}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {/* Right: Sublocations */}
+            <div className="w-full sm:w-1/2 pl-4">
+              <h4 className="text-lg font-semibold mb-2 text-blue-700">
+                {selectedDistrict
+                  ? `Select a local area within ${selectedDistrict}`
+                  : "Select a local area"}
+              </h4>
+              {selectedDistrict ? (
+                <>
+                  <div className="mb-2 font-semibold text-gray-700">Popular areas</div>
+                  <ul className="space-y-1 mb-4">
+                    {locations
+                      .find(loc => loc.district === selectedDistrict)
+                      ?.sublocations?.map(sub => (
+                        <li key={sub}>
+                          <button
+                            className="w-full text-left px-2 py-2 rounded hover:bg-green-50 font-semibold text-green-700 transition-all"
+                            onClick={() => {
+                              setSubLocation(sub);
+                              setLocation(`${selectedDistrict}, ${sub}`);
+                              setShowLocationModal(false);
+                              setSelectedDistrict(null);
+                            }}
+                          >
+                            {sub}
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                </>
+              ) : (
+                <div className="text-gray-500 text-sm">Select a district to see areas</div>
+              )}
+              <button
+                onClick={() => setShowLocationModal(false)}
+                className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 transition-all font-semibold mt-4"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Category Change Modal */}
       {showCategoryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
@@ -146,7 +359,10 @@ export default function SellHeavyDuty() {
           <Select
             options={brands.map(b => ({ value: b, label: b }))}
             value={brand ? { value: brand, label: brand } : null}
-            onChange={option => setBrand(option ? option.value : "")}
+            onChange={option => {
+              setBrand(option ? option.value : "");
+              setModel(""); // Reset model when brand changes
+            }}
             isClearable
             placeholder="Brand"
             classNamePrefix="react-select"
@@ -200,18 +416,19 @@ export default function SellHeavyDuty() {
             ))}
           </div>
         </div>
-        <div className="space-y-2">
+        <div>
           <label className="block text-sm font-medium mb-1">Vehicle Type</label>
-          <Select
-            options={vehicleTypes}
-            value={vehicleType ? { value: vehicleType, label: vehicleType } : null}
-            onChange={option => setVehicleType(option ? option.value : "")}
-            isClearable
-            placeholder="Select vehicle type"
-            classNamePrefix="react-select"
-            className={showValidation && !vehicleType ? "border-red-500" : ""}
-          />
-          {!vehicleType && showValidation && (
+          <select
+            value={vehicleType}
+            onChange={e => setVehicleType(e.target.value)}
+            className={`border rounded px-3 py-2 w-full ${showValidation && !vehicleType ? "border-red-500" : ""}`}
+          >
+            <option value="">Vehicle Type</option>
+            {vehicleTypes.map((v) => (
+              <option key={v} value={v}>{v}</option>
+            ))}
+          </select>
+          {showValidation && !vehicleType && (
             <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
           )}
         </div>
@@ -245,13 +462,20 @@ export default function SellHeavyDuty() {
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Price (Rs)</label>
-          <input
-            type="text"
-            value={price}
-            onChange={e => setPrice(e.target.value)}
-            className={`border rounded px-3 py-2 w-full ${showValidation && (!price || isNaN(price) || Number(price) <= 0) ? "border-red-500" : ""}`}
-            placeholder="Pick a good price - what would you pay?"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={formatNumberWithCommas(price)}
+              onChange={e => {
+                // Remove commas and non-numeric chars before storing
+                const raw = e.target.value.replace(/,/g, "").replace(/[^0-9]/g, "");
+                setPrice(raw);
+              }}
+              className={`border rounded px-3 py-2 w-full pr-10 ${showValidation && (!price || isNaN(price) || Number(price) <= 0) ? "border-red-500" : ""}`}
+              placeholder="How much do you want to sell your car for?"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">Rs</span>
+          </div>
           {showValidation && (!price || isNaN(price) || Number(price) <= 0) && (
             <div className="text-xs text-red-500 mt-1">You must fill out this field with a valid price.</div>
           )}
@@ -276,6 +500,42 @@ export default function SellHeavyDuty() {
           />
           {showValidation && (!year || isNaN(year) || Number(year) < 1900) && (
             <div className="text-xs text-red-500 mt-1">Must be at least 1900</div>
+          )}
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Mileage (km)</label>
+          <div className="relative">
+            <input
+              type="text"
+              value={formatNumberWithCommas(mileage)}
+              onChange={e => {
+                // Remove commas and non-numeric chars before storing
+                const raw = e.target.value.replace(/,/g, "").replace(/[^0-9]/g, "");
+                setMileage(raw);
+              }}
+              className={`border rounded px-3 py-2 w-full pr-10 ${showValidation && (!mileage || isNaN(mileage) || Number(mileage) < 0) ? "border-red-500" : ""}`}
+              placeholder="What is the mileage of your car?"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">km</span>
+          </div>
+          {showValidation && (!mileage || isNaN(mileage) || Number(mileage) < 0) && (
+            <div className="text-xs text-red-500 mt-1">Must be a valid mileage.</div>
+          )}
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Engine capacity (cc)</label>
+          <div className="relative">
+            <input
+              type="text"
+              value={engine}
+              onChange={e => setEngine(e.target.value.replace(/[^0-9]/g, ""))}
+              className={`border rounded px-3 py-2 w-full pr-10 ${showValidation && (!engine || isNaN(engine) || Number(engine) < 1) ? "border-red-500" : ""}`}
+              placeholder="What is the engine capacity of your car?"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">cc</span>
+          </div>
+          {showValidation && (!engine || isNaN(engine) || Number(engine) < 1) && (
+            <div className="text-xs text-red-500 mt-1">Must be a valid engine capacity.</div>
           )}
         </div>
         <hr className="my-6" />

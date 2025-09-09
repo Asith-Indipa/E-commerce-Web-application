@@ -4,12 +4,6 @@ import { BASE_URL } from "../util/api.js";
 
 const conditions = ["Used", "Reconditioned", "New"];
 
-// Helper to format number with commas
-function formatNumberWithCommas(num) {
-  if (!num) return "";
-  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-}
-
 export default function SellBoats() {
   const [location, setLocation] = useState("Kamburupitiya");
   const [category, setCategory] = useState("Boats & Water Transport");
@@ -93,7 +87,7 @@ export default function SellBoats() {
       });
       const data = await res.json();
       if (data.success) {
-        setSuccess("✅ Post your Ad successfully!");
+        setSuccess("Post your Ad successfully");
         setShowValidation(false);
         setTitle("");
         setDescription("");
@@ -102,12 +96,9 @@ export default function SellBoats() {
         setPhotos([null, null, null, null, null]);
         setError("");
         setCondition("Used");
-        setDistrict("");
-        setSubLocation("");
         setTimeout(() => {
           setSuccess("");
-          navigate("/");
-        }, 2000); // Show alert for 2 seconds, then redirect
+        }, 3000);
       } else {
         setError(data.error || "Failed to save vehicle details");
       }
@@ -118,13 +109,6 @@ export default function SellBoats() {
 
   return (
     <div className="max-w-2xl mx-auto px-2 sm:px-4 py-6 sm:py-8">
-      {/* Attractive notification sliding from right, mobile responsive */}
-      {success && (
-        <div className="fixed top-6 right-4 sm:right-8 z-50 bg-blue-600 text-white px-5 py-3 rounded-lg shadow-lg font-semibold text-base transition-all animate-slide-in w-[90vw] max-w-xs sm:max-w-sm"
-          style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.15)" }}>
-          <span role="alert">{success}</span>
-        </div>
-      )}
       <h1 className="text-xl sm:text-2xl font-bold mb-4">Fill in the details</h1>
       <div className="flex flex-col sm:flex-row gap-2 mb-4 items-center">
         <div className="flex items-center gap-2">
@@ -259,6 +243,12 @@ export default function SellBoats() {
         </div>
       )}
       <form className="space-y-4" onSubmit={handleSubmit}>
+        {success && (
+          <div className="fixed top-6 right-4 sm:right-8 z-50 bg-blue-600 text-white px-5 py-3 rounded-lg shadow-lg font-semibold text-base transition-all animate-slide-in w-[90vw] max-w-xs sm:max-w-sm"
+            style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.15)" }}>
+            <span role="alert">✅ {success}</span>
+          </div>
+        )}
         <div className="flex gap-4 flex-wrap">
           {conditions.map((c) => (
             <label key={c} className="flex items-center gap-1 text-sm">
@@ -304,20 +294,13 @@ export default function SellBoats() {
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Price (Rs)</label>
-          <div className="relative">
-            <input
-              type="text"
-              value={formatNumberWithCommas(price)}
-              onChange={e => {
-                // Remove commas and non-numeric chars before storing
-                const raw = e.target.value.replace(/,/g, "").replace(/[^0-9]/g, "");
-                setPrice(raw);
-              }}
-              className={`border rounded px-3 py-2 w-full pr-10 ${showValidation && (!price || isNaN(price) || Number(price) <= 0) ? "border-red-500" : ""}`}
-              placeholder="Pick a good price"
-            />
-            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">Rs</span>
-          </div>
+          <input
+            type="text"
+            value={price}
+            onChange={e => setPrice(e.target.value)}
+            className={`border rounded px-3 py-2 w-full ${showValidation && (!price || isNaN(price) || Number(price) <= 0) ? "border-red-500" : ""}`}
+            placeholder="Pick a good price"
+          />
           {showValidation && (!price || isNaN(price) || Number(price) <= 0) && (
             <div className="text-xs text-red-500 mt-1">You must fill out this field with a valid price.</div>
           )}

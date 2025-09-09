@@ -3,8 +3,6 @@ import { useNavigate } from "react-router-dom";
 import Select from "react-select";
 
 const conditions = ["Used", "Reconditioned", "New"];
-const brands = ["Brand 1", "Brand 2", "Brand 3"];
-const models = ["Model 1", "Model 2", "Model 3"];
 
 export default function SellLorries() {
   const [location, setLocation] = useState("Kamburupitiya");
@@ -25,6 +23,11 @@ export default function SellLorries() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categories, setCategories] = useState([]);
   const [showValidation, setShowValidation] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [locations, setLocations] = useState([]);
+  const [selectedDistrict, setSelectedDistrict] = useState(null);
+  const [district, setDistrict] = useState("");
+  const [subLocation, setSubLocation] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -40,6 +43,71 @@ export default function SellLorries() {
     fetchCategories();
   }, []);
 
+  useEffect(() => {
+    // Fetch brands for Lorries & Trucks from vehiclemodelbrands table
+    const fetchBrands = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/vehiclemodelbrand/all");
+        const data = await res.json();
+        // Filter brands for Lorries & Trucks category and remove duplicates
+        const lorryBrands = Array.from(
+          new Set(
+            data
+              .filter((item) => item.category === "Lorries & Trucks")
+              .map((item) => item.brand)
+          )
+        );
+        setBrands(lorryBrands);
+      } catch {
+        setBrands([]);
+      }
+    };
+    fetchBrands();
+  }, []);
+
+  useEffect(() => {
+    // Fetch models for selected brand in Lorries & Trucks category
+    const fetchModels = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/vehiclemodelbrand/all");
+        const data = await res.json();
+        const lorryModels = Array.from(
+          new Set(
+            data
+              .filter((item) => item.category === "Lorries & Trucks" && item.brand === brand)
+              .map((item) => item.model)
+          )
+        );
+        setModels(lorryModels);
+      } catch {
+        setModels([]);
+      }
+    };
+    if (brand) {
+      fetchModels();
+    } else {
+      setModels([]);
+    }
+  }, [brand]);
+
+  useEffect(() => {
+    // Fetch locations from backend
+    const fetchLocations = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/location/all");
+        const data = await res.json();
+        const arr = Object.entries(data).map(([district, sublocations]) => ({
+          district,
+          sublocations
+        }));
+        setLocations(arr);
+      } catch {
+        setLocations([]);
+      }
+    };
+    fetchLocations();
+  }, []);
+
   const handlePhotoChange = (idx, file) => {
     const newPhotos = [...photos];
     newPhotos[idx] = file;
@@ -52,7 +120,12 @@ export default function SellLorries() {
       <div className="flex flex-col sm:flex-row gap-2 mb-4 items-center">
         <div className="flex items-center gap-2">
           <span className="text-green-700 font-semibold">{location}</span>
-          <button className="text-blue-600 underline text-xs">Change</button>
+          <button
+            className="text-blue-600 underline text-xs"
+            onClick={() => setShowLocationModal(true)}
+          >
+            Change
+          </button>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-green-700 font-semibold">{category}</span>
@@ -64,6 +137,75 @@ export default function SellLorries() {
           </button>
         </div>
       </div>
+      {/* Location Change Modal */}
+      {showLocationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-3xl mx-auto flex flex-col sm:flex-row gap-0">
+            {/* Left: Districts */}
+            <div className="w-full sm:w-1/2 border-r pr-4">
+              <h4 className="text-lg font-semibold mb-2 text-blue-700">Select City or Division</h4>
+              <ul className="space-y-1">
+                {locations.map(loc => (
+                  <li key={loc.district}>
+                    <button
+                      className={`w-full text-left px-2 py-2 rounded hover:bg-blue-50 font-semibold text-blue-700 transition-all flex justify-between items-center ${
+                        selectedDistrict === loc.district ? "bg-blue-100" : ""
+                      }`}
+                      onClick={() => {
+                        setSelectedDistrict(loc.district);
+                        setDistrict(loc.district);
+                      }}
+                    >
+                      <span>{loc.district}</span>
+                      <span className="text-gray-400">{'>'}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {/* Right: Sublocations */}
+            <div className="w-full sm:w-1/2 pl-4">
+              <h4 className="text-lg font-semibold mb-2 text-blue-700">
+                {selectedDistrict
+                  ? `Select a local area within ${selectedDistrict}`
+                  : "Select a local area"}
+              </h4>
+              {selectedDistrict ? (
+                <>
+                  <div className="mb-2 font-semibold text-gray-700">Popular areas</div>
+                  <ul className="space-y-1 mb-4">
+                    {locations
+                      .find(loc => loc.district === selectedDistrict)
+                      ?.sublocations?.map(sub => (
+                        <li key={sub}>
+                          <button
+                            className="w-full text-left px-2 py-2 rounded hover:bg-green-50 font-semibold text-green-700 transition-all"
+                            onClick={() => {
+                              setSubLocation(sub);
+                              setLocation(`${selectedDistrict}, ${sub}`);
+                              setShowLocationModal(false);
+                              setSelectedDistrict(null);
+                            }}
+                          >
+                            {sub}
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                </>
+              ) : (
+                <div className="text-gray-500 text-sm">Select a district to see areas</div>
+              )}
+              <button
+                onClick={() => setShowLocationModal(false)}
+                className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 transition-all font-semibold mt-4"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Category Change Modal */}
       {showCategoryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
@@ -115,7 +257,10 @@ export default function SellLorries() {
           <Select
             options={brands.map(b => ({ value: b, label: b }))}
             value={brand ? { value: brand, label: brand } : null}
-            onChange={option => setBrand(option ? option.value : "")}
+            onChange={option => {
+              setBrand(option ? option.value : "");
+              setModel(""); // Reset model when brand changes
+            }}
             isClearable
             placeholder="Brand"
             classNamePrefix="react-select"

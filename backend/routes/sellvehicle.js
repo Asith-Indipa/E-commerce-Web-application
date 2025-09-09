@@ -19,15 +19,17 @@ const upload = multer({ storage });
 // Define schema
 const sellVehicleSchema = new mongoose.Schema({
   brand: String,
-  model: String,         // Add this field
-  trim: String,          // Add this field
+  model: String,
+  trim: String,
   condition: String,
-  year: String,          // Add this field
-  mileage: String,       // Add this field
-  engine: String,        // Add this field
-  fuel: String,           // Add this field
-  transmission: String,   // Add this field
-  bodyType: String,       // Add this field
+  year: String,
+  mileage: String,
+  engine: String,
+  fuel: String,
+  transmission: String,
+  bodyType: String,
+  vehicleType: String, // Add this field
+  title: String,       // Add this field
   description: String,
   price: Number,
   photos: [String], // You can use [String] for file names or base64 strings
@@ -54,9 +56,11 @@ router.post("/add", upload.array("photos", 5), async (req, res) => {
       year,
       mileage,
       engine,
-      fuel,           // Add this field
-      transmission,   // Add this field
-      bodyType,       // Add this field
+      fuel,
+      transmission,
+      bodyType,
+      vehicleType, // Add this field
+      title,       // Add this field
       description,
       price,
       negotiable,
@@ -76,9 +80,11 @@ router.post("/add", upload.array("photos", 5), async (req, res) => {
       year,
       mileage,
       engine,
-      fuel,           // Add this field
-      transmission,   // Add this field
-      bodyType,       // Add this field
+      fuel,
+      transmission,
+      bodyType,
+      vehicleType, // Add this field
+      title,       // Add this field
       description,
       price: numericPrice,
       photos: photoPaths,

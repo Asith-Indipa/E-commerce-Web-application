@@ -375,7 +375,10 @@ export default function SellCars() {
           <Select
             options={brands.map(b => ({ value: b, label: b }))}
             value={brand ? { value: brand, label: brand } : null}
-            onChange={option => setBrand(option ? option.value : "")}
+            onChange={option => {
+              setBrand(option ? option.value : "");
+              setModel(""); // Reset model when brand changes
+            }}
             isClearable
             placeholder="Brand"
             classNamePrefix="react-select"
