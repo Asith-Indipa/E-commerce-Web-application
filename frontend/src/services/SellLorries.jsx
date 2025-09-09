@@ -4,6 +4,12 @@ import Select from "react-select";
 
 const conditions = ["Used", "Reconditioned", "New"];
 
+// Helper to format number with commas
+function formatNumberWithCommas(num) {
+  if (!num) return "";
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
+
 export default function SellLorries() {
   const [location, setLocation] = useState("Kamburupitiya");
   const [category, setCategory] = useState("Lorries & Trucks");
@@ -28,6 +34,7 @@ export default function SellLorries() {
   const [selectedDistrict, setSelectedDistrict] = useState(null);
   const [district, setDistrict] = useState("");
   const [subLocation, setSubLocation] = useState("");
+  const [success, setSuccess] = useState(""); // Add this state
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -114,8 +121,82 @@ export default function SellLorries() {
     setPhotos(newPhotos);
   };
 
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setShowValidation(true);
+    const priceValid = price && !isNaN(price) && Number(price) > 0;
+    const yearValid = year && !isNaN(year) && Number(year) >= 1900;
+    const mileageValid = mileage && !isNaN(mileage) && Number(mileage) >= 0;
+    const engineValid = engine && !isNaN(engine) && Number(engine) >= 1;
+    if (
+      !brand ||
+      !model ||
+      !yearValid ||
+      !mileageValid ||
+      !engineValid ||
+      !description ||
+      !priceValid ||
+      !photos.some((p) => p)
+    ) {
+      return;
+    }
+    const formData = new FormData();
+    formData.append("brand", brand);
+    formData.append("model", model);
+    formData.append("trim", trim);
+    formData.append("condition", condition);
+    formData.append("year", year);
+    formData.append("mileage", mileage + "km");
+    formData.append("engine", engine + "cc");
+    formData.append("description", description);
+    formData.append("price", price);
+    formData.append("negotiable", negotiable);
+    formData.append("category", category);
+    formData.append("location", location);
+    formData.append("district", location.split(",")[0]);
+    formData.append("subLocation", location.split(",")[1] ? location.split(",")[1].trim() : "");
+    photos.forEach((photo) => {
+      if (photo) formData.append("photos", photo);
+    });
+    try {
+      const res = await fetch("http://localhost:5000/api/sellvehicle/add", {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccess("✅ Post your Ad successfully!");
+        setShowValidation(false);
+        setBrand("");
+        setModel("");
+        setTrim("");
+        setCondition("Used");
+        setYear("");
+        setMileage("");
+        setEngine("");
+        setDescription("");
+        setPrice("");
+        setNegotiable(false);
+        setPhotos([null, null, null, null, null]);
+        setTimeout(() => {
+          setSuccess("");
+          navigate("/");
+        }, 2000); // Show alert for 2 seconds, then redirect
+      }
+    } catch (err) {
+      // Optionally show error message
+    }
+  };
+
   return (
     <div className="max-w-2xl mx-auto px-2 sm:px-4 py-6 sm:py-8">
+      {/* Success notification */}
+      {success && (
+        <div className="fixed top-6 right-4 sm:right-8 z-50 bg-blue-600 text-white px-5 py-3 rounded-lg shadow-lg font-semibold text-base transition-all animate-slide-in w-[90vw] max-w-xs sm:max-w-sm"
+          style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.15)" }}>
+          <span role="alert">{success}</span>
+        </div>
+      )}
       <h1 className="text-xl sm:text-2xl font-bold mb-4">Fill in the details</h1>
       <div className="flex flex-col sm:flex-row gap-2 mb-4 items-center">
         <div className="flex items-center gap-2">
@@ -251,7 +332,7 @@ export default function SellLorries() {
           </div>
         </div>
       )}
-      <form className="space-y-4">
+      <form className="space-y-4" onSubmit={handleSubmit}>
         <div className="space-y-2">
           <label className="block text-sm font-medium mb-1">Brand</label>
           <Select
@@ -314,48 +395,89 @@ export default function SellLorries() {
             ))}
           </div>
         </div>
-        <input
-          type="text"
-          value={year}
-          onChange={e => setYear(e.target.value)}
-          className="border rounded px-3 py-2 w-full"
-          placeholder="Model year"
-        />
-        <input
-          type="text"
-          value={mileage}
-          onChange={e => setMileage(e.target.value)}
-          className="border rounded px-3 py-2 w-full"
-          placeholder="Enter the mileage of the vehicle."
-        />
-        <input
-          type="text"
-          value={engine}
-          onChange={e => setEngine(e.target.value)}
-          className="border rounded px-3 py-2 w-full"
-          placeholder="Engine capacity"
-        />
+        <div>
+          <label className="block text-sm font-medium mb-1">Model year</label>
+          <input
+            type="text"
+            value={year}
+            onChange={e => setYear(e.target.value)}
+            className={`border rounded px-3 py-2 w-full ${showValidation && (!year || isNaN(year) || Number(year) < 1900) ? "border-red-500" : ""}`}
+            placeholder="Model year"
+          />
+          {showValidation && (!year || isNaN(year) || Number(year) < 1900) && (
+            <div className="text-xs text-red-500 mt-1">Must be at least 1900</div>
+          )}
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Mileage (km)</label>
+          <div className="relative">
+            <input
+              type="text"
+              value={formatNumberWithCommas(mileage)}
+              onChange={e => {
+                // Remove commas and non-numeric chars before storing
+                const raw = e.target.value.replace(/,/g, "").replace(/[^0-9]/g, "");
+                setMileage(raw);
+              }}
+              className={`border rounded px-3 py-2 w-full pr-10 ${showValidation && (!mileage || isNaN(mileage) || Number(mileage) < 0) ? "border-red-500" : ""}`}
+              placeholder="What is the mileage of your car?"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">km</span>
+          </div>
+          {showValidation && (!mileage || isNaN(mileage) || Number(mileage) < 0) && (
+            <div className="text-xs text-red-500 mt-1">Must be a valid mileage.</div>
+          )}
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Engine capacity (cc)</label>
+          <div className="relative">
+            <input
+              type="text"
+              value={engine}
+              onChange={e => setEngine(e.target.value.replace(/[^0-9]/g, ""))}
+              className={`border rounded px-3 py-2 w-full pr-10 ${showValidation && (!engine || isNaN(engine) || Number(engine) < 1) ? "border-red-500" : ""}`}
+              placeholder="What is the engine capacity of your car?"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">cc</span>
+          </div>
+          {showValidation && (!engine || isNaN(engine) || Number(engine) < 1) && (
+            <div className="text-xs text-red-500 mt-1">Must be a valid engine capacity.</div>
+          )}
+        </div>
         <div>
           <label className="block text-sm font-medium mb-1">Description</label>
           <textarea
             value={description}
             onChange={e => setDescription(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-2 w-full ${showValidation && !description ? "border-red-500" : ""}`}
             rows={4}
             maxLength={5000}
             placeholder="More details = more interested buyers!"
           />
           <div className="text-xs text-gray-500 text-right mt-1">{description.length}/5000</div>
+          {showValidation && !description && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Price (Rs)</label>
-          <input
-            type="text"
-            value={price}
-            onChange={e => setPrice(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
-            placeholder="Pick a good price - what would you pay?"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={formatNumberWithCommas(price)}
+              onChange={e => {
+                // Remove commas and non-numeric chars before storing
+                const raw = e.target.value.replace(/,/g, "").replace(/[^0-9]/g, "");
+                setPrice(raw);
+              }}
+              className={`border rounded px-3 py-2 w-full pr-10 ${showValidation && (!price || isNaN(price) || Number(price) <= 0) ? "border-red-500" : ""}`}
+              placeholder="How much do you want to sell your car for?"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">Rs</span>
+          </div>
+          {showValidation && (!price || isNaN(price) || Number(price) <= 0) && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field with a valid price.</div>
+          )}
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -374,7 +496,11 @@ export default function SellLorries() {
               <label
                 key={idx}
                 className={`flex flex-col items-center justify-center border-2 border-dashed rounded w-20 h-20 cursor-pointer ${
-                  photo ? "border-blue-600" : "border-gray-300"
+                  showValidation && !photos.some((p) => p)
+                    ? "border-red-500"
+                    : photo
+                    ? "border-blue-600"
+                    : "border-gray-300"
                 }`}
               >
                 <input
@@ -395,6 +521,17 @@ export default function SellLorries() {
               </label>
             ))}
           </div>
+          {showValidation && !photos.some((p) => p) && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
+        </div>
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base"
+          >
+            Submit
+          </button>
         </div>
       </form>
     </div>

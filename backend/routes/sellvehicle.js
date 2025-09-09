@@ -18,6 +18,7 @@ const upload = multer({ storage });
 
 // Define schema
 const sellVehicleSchema = new mongoose.Schema({
+  bikeType: String,    // Add this field
   brand: String,
   model: String,
   trim: String,
@@ -49,6 +50,7 @@ router.post("/add", upload.array("photos", 5), async (req, res) => {
     console.log("Received body:", req.body); // Debug: log incoming fields
     console.log("Received files:", req.files); // Debug: log incoming files
     const {
+      bikeType,      // Add this field
       brand,
       model,
       trim,
@@ -73,6 +75,7 @@ router.post("/add", upload.array("photos", 5), async (req, res) => {
     // Convert price to number (remove commas if present)
     const numericPrice = typeof price === "string" ? Number(price.replace(/,/g, "")) : price;
     const vehicle = new SellVehicleDetails({
+      bikeType,      // Add this field
       brand,
       model,
       trim,

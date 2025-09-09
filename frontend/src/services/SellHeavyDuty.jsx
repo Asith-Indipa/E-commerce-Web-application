@@ -522,8 +522,7 @@ export default function SellHeavyDuty() {
             <div className="text-xs text-red-500 mt-1">Must be a valid mileage.</div>
           )}
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Engine capacity (cc)</label>
+        <div>          <label className="block text-sm font-medium mb-1">Engine capacity (cc)</label>
           <div className="relative">
             <input
               type="text"
