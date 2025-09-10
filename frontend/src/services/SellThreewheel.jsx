@@ -20,6 +20,7 @@ export default function SellThreewheel() {
   const [photos, setPhotos] = useState([null, null, null, null, null]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categories, setCategories] = useState([]);
+  const [showValidation, setShowValidation] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -39,6 +40,26 @@ export default function SellThreewheel() {
     const newPhotos = [...photos];
     newPhotos[idx] = file;
     setPhotos(newPhotos);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setShowValidation(true);
+    const priceValid = price && !isNaN(price) && Number(price) > 0;
+    const yearValid = year && !isNaN(year) && Number(year) >= 1900;
+    const mileageValid = mileage && !isNaN(mileage) && Number(mileage) >= 0;
+    if (
+      !brand ||
+      !model ||
+      !yearValid ||
+      !mileageValid ||
+      !description ||
+      !priceValid ||
+      !photos.some((p) => p)
+    ) {
+      return;
+    }
+    // ...submit logic...
   };
 
   return (
@@ -104,32 +125,38 @@ export default function SellThreewheel() {
           </div>
         </div>
       )}
-      <form className="space-y-4">
+      <form className="space-y-4" onSubmit={handleSubmit}>
         <div>
           <label className="block text-sm font-medium mb-1">Brand</label>
           <select
             value={brand}
             onChange={e => setBrand(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-2 w-full ${showValidation && !brand ? "border-red-500" : ""}`}
           >
             <option value="">Brand</option>
             {brands.map((b) => (
               <option key={b} value={b}>{b}</option>
             ))}
           </select>
+          {showValidation && !brand && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Model</label>
           <select
             value={model}
             onChange={e => setModel(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-2 w-full ${showValidation && !model ? "border-red-500" : ""}`}
           >
             <option value="">Model</option>
             {models.map((m) => (
               <option key={m} value={m}>{m}</option>
             ))}
           </select>
+          {showValidation && !model && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Trim / Edition (optional)</label>
@@ -164,12 +191,15 @@ export default function SellThreewheel() {
           <textarea
             value={description}
             onChange={e => setDescription(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-2 w-full ${showValidation && !description ? "border-red-500" : ""}`}
             rows={4}
             maxLength={5000}
             placeholder="More details = more interested buyers!"
           />
           <div className="text-xs text-gray-500 text-right mt-1">{description.length}/5000</div>
+          {showValidation && !description && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Price (Rs)</label>
@@ -177,9 +207,12 @@ export default function SellThreewheel() {
             type="text"
             value={price}
             onChange={e => setPrice(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-2 w-full ${showValidation && (!price || isNaN(price) || Number(price) <= 0) ? "border-red-500" : ""}`}
             placeholder="Pick a good price"
           />
+          {showValidation && (!price || isNaN(price) || Number(price) <= 0) && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field with a valid price.</div>
+          )}
         </div>
         <label className="flex items-center gap-2 text-sm">
           <input
@@ -196,9 +229,12 @@ export default function SellThreewheel() {
             type="text"
             value={year}
             onChange={e => setYear(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-2 w-full ${showValidation && (!year || isNaN(year) || Number(year) < 1900) ? "border-red-500" : ""}`}
             placeholder="Model year"
           />
+          {showValidation && (!year || isNaN(year) || Number(year) < 1900) && (
+            <div className="text-xs text-red-500 mt-1">Must be at least 1900</div>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Mileage (km)</label>
@@ -206,9 +242,12 @@ export default function SellThreewheel() {
             type="text"
             value={mileage}
             onChange={e => setMileage(e.target.value)}
-            className="border rounded px-3 py-2 w-full"
+            className={`border rounded px-3 py-2 w-full ${showValidation && (!mileage || isNaN(mileage) || Number(mileage) < 0) ? "border-red-500" : ""}`}
             placeholder="Enter the mileage of the vehicle."
           />
+          {showValidation && (!mileage || isNaN(mileage) || Number(mileage) < 0) && (
+            <div className="text-xs text-red-500 mt-1">Must be a valid mileage.</div>
+          )}
         </div>
         <hr className="my-6" />
         <div>
@@ -218,7 +257,11 @@ export default function SellThreewheel() {
               <label
                 key={idx}
                 className={`flex flex-col items-center justify-center border-2 border-dashed rounded w-20 h-20 cursor-pointer ${
-                  photo ? "border-blue-600" : "border-gray-300"
+                  showValidation && !photos.some((p) => p)
+                    ? "border-red-500"
+                    : photo
+                    ? "border-blue-600"
+                    : "border-gray-300"
                 }`}
               >
                 <input
@@ -239,6 +282,17 @@ export default function SellThreewheel() {
               </label>
             ))}
           </div>
+          {showValidation && !photos.some((p) => p) && (
+            <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
+          )}
+        </div>
+        <div className="flex justify-end">
+          <button
+            type="submit"
+            className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 text-sm sm:text-base"
+          >
+            Submit
+          </button>
         </div>
       </form>
     </div>
