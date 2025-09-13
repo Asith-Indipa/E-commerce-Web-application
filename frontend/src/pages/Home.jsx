@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { Link } from "react-router-dom";
 import { BASE_URL } from "../util/api.js";
 
 export default function Home() {
   const [vehicles, setVehicles] = useState([]);
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 25;
+  const mainRef = useRef(null);
 
   useEffect(() => {
     fetch(`${BASE_URL}/api/sellvehicle/all`)
@@ -12,10 +15,71 @@ export default function Home() {
       .catch(() => setVehicles([]));
   }, []);
 
+  useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollIntoView({ behavior: "smooth" });
+    } else {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  }, [currentPage]);
+
   // Helper to format number with commas
   function formatNumberWithCommas(num) {
     if (!num && num !== 0) return "";
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  }
+
+  // Pagination calculations
+  const totalPages = Math.ceil(vehicles.length / itemsPerPage);
+  const paginatedVehicles = vehicles.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
+  // Helper to render pagination numbers
+  function renderPagination() {
+    const pages = [];
+    const maxPagesToShow = 5;
+    let startPage = Math.max(1, currentPage - 2);
+    let endPage = Math.min(totalPages, startPage + maxPagesToShow - 1);
+
+    if (endPage - startPage < maxPagesToShow - 1) {
+      startPage = Math.max(1, endPage - maxPagesToShow + 1);
+    }
+
+    for (let i = startPage; i <= endPage; i++) {
+      pages.push(
+        <button
+          key={i}
+          className={`mx-1 px-2 py-1 rounded ${i === currentPage ? "font-bold text-black" : "text-gray-500 hover:text-blue-600"}`}
+          onClick={() => setCurrentPage(i)}
+          disabled={i === currentPage}
+        >
+          {i}
+        </button>
+      );
+    }
+
+    return (
+      <div className="flex items-center justify-center mt-6">
+        <button
+          className="text-gray-400 px-2 py-1 mr-2"
+          onClick={() => setCurrentPage(currentPage - 1)}
+          disabled={currentPage === 1}
+        >
+          &lt; Previous
+        </button>
+        {pages}
+        {endPage < totalPages && <span className="mx-1">...</span>}
+        <button
+          className="text-blue-600 px-2 py-1 ml-2"
+          onClick={() => setCurrentPage(currentPage + 1)}
+          disabled={currentPage === totalPages}
+        >
+          Next &gt;
+        </button>
+      </div>
+    );
   }
 
   const categories = [
@@ -75,7 +139,7 @@ export default function Home() {
           </div>
         </aside>
         {/* Main Content */}
-        <main className="flex-1">
+        <main className="flex-1" ref={mainRef}>
           <div className="mb-4 text-sm text-gray-500">
             Home &gt; All ads &gt; Vehicles
           </div>
@@ -83,10 +147,10 @@ export default function Home() {
             New and Used Vehicles for Sale in Sri Lanka
           </h2>
           <div className="text-xs text-gray-500 mb-4">
-            Showing {vehicles.length} ads
+            Showing {paginatedVehicles.length} of {vehicles.length} ads
           </div>
           <div className="flex flex-col gap-4">
-            {vehicles.map((vehicle, idx) => (
+            {paginatedVehicles.map((vehicle, idx) => (
               <div
                 key={vehicle._id || idx}
                 className="border border-yellow-400 bg-white rounded-lg shadow hover:shadow-lg transition-shadow flex flex-row items-center p-3 sm:p-4 relative"
@@ -158,6 +222,7 @@ export default function Home() {
               </div>
             ))}
           </div>
+          {totalPages > 1 && renderPagination()}
         </main>
       </div>
     </div>
