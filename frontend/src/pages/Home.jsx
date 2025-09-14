@@ -172,7 +172,7 @@ export default function Home() {
                 <div className="flex-1 pl-4 flex flex-col justify-between h-full">
                   <div className="flex items-center gap-2 mb-1">
                     <h3 className="font-semibold text-base sm:text-lg text-gray-900">
-                      {vehicle.title}
+                      {vehicle.title || `${vehicle.brand || ""} ${vehicle.model || ""}`}
                     </h3>
                     {vehicle.urgent && (
                       <span className="bg-red-600 text-white text-xs px-2 py-1 rounded font-bold ml-2 absolute top-2 right-2">URGENT</span>

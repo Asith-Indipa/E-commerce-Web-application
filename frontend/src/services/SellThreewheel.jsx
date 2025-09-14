@@ -1,9 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import Select from "react-select"; // Add this import
+import { BASE_URL } from "../util/api.js";
 
 const conditions = ["Used", "Reconditioned", "New"];
-const brands = ["Brand 1", "Brand 2", "Brand 3"];
-const models = ["Model 1", "Model 2", "Model 3"];
+
+// Helper to format number with commas
+function formatNumberWithCommas(num) {
+  if (!num) return "";
+  return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+}
 
 export default function SellThreewheel() {
   const [location, setLocation] = useState("Kamburupitiya");
@@ -21,12 +27,20 @@ export default function SellThreewheel() {
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categories, setCategories] = useState([]);
   const [showValidation, setShowValidation] = useState(false);
+  const [locations, setLocations] = useState([]);
+  const [showLocationModal, setShowLocationModal] = useState(false);
+  const [selectedDistrict, setSelectedDistrict] = useState(null);
+  const [district, setDistrict] = useState("");
+  const [subLocation, setSubLocation] = useState("");
+  const [brands, setBrands] = useState([]);
+  const [models, setModels] = useState([]);
+  const [success, setSuccess] = useState(""); // Add this state
   const navigate = useNavigate();
 
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/vehiclecategory/all");
+        const res = await fetch(`${BASE_URL}/api/vehiclecategory/all`);
         const data = await res.json();
         setCategories(data);
       } catch {
@@ -34,7 +48,64 @@ export default function SellThreewheel() {
       }
     };
     fetchCategories();
+
+    const fetchLocations = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/api/location/all`);
+        const data = await res.json();
+        const arr = Object.entries(data).map(([district, sublocations]) => ({
+          district,
+          sublocations
+        }));
+        setLocations(arr);
+      } catch {
+        setLocations([]);
+      }
+    };
+    fetchLocations();
+
+    const fetchBrands = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/api/vehiclemodelbrand/all`);
+        const data = await res.json();
+        const threeBrands = Array.from(
+          new Set(
+            data
+              .filter((item) => item.category === "Three Wheelers")
+              .map((item) => item.brand)
+          )
+        );
+        setBrands(threeBrands);
+      } catch {
+        setBrands([]);
+      }
+    };
+    fetchBrands();
   }, []);
+
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        const res = await fetch(`${BASE_URL}/api/vehiclemodelbrand/all`);
+        const data = await res.json();
+        const threeModels = Array.from(
+          new Set(
+            data
+              .filter((item) => item.category === "Three Wheelers" && item.brand === brand)
+              .map((item) => item.model)
+          )
+        );
+        setModels(threeModels);
+      } catch {
+        setModels([]);
+      }
+    };
+    if (brand) {
+      fetchModels();
+    } else {
+      setModels([]);
+    }
+  }, [brand]);
 
   const handlePhotoChange = (idx, file) => {
     const newPhotos = [...photos];
@@ -48,7 +119,10 @@ export default function SellThreewheel() {
     const priceValid = price && !isNaN(price) && Number(price) > 0;
     const yearValid = year && !isNaN(year) && Number(year) >= 1900;
     const mileageValid = mileage && !isNaN(mileage) && Number(mileage) >= 0;
+    // Generate title from brand and model if not provided
+    const title = brand && model ? `${brand} ${model}` : "";
     if (
+      !condition ||
       !brand ||
       !model ||
       !yearValid ||
@@ -59,16 +133,72 @@ export default function SellThreewheel() {
     ) {
       return;
     }
-    // ...submit logic...
+    const formData = new FormData();
+    formData.append("title", title); // Add title to formData
+    formData.append("condition", condition);
+    formData.append("brand", brand);
+    formData.append("model", model);
+    formData.append("trim", trim);
+    formData.append("year", year);
+    formData.append("mileage", mileage + "km");
+    formData.append("description", description);
+    formData.append("price", price);
+    formData.append("negotiable", negotiable);
+    formData.append("category", category);
+    formData.append("location", location);
+    formData.append("district", location.split(",")[0]);
+    formData.append("subLocation", location.split(",")[1] ? location.split(",")[1].trim() : "");
+    photos.forEach((photo) => {
+      if (photo) formData.append("photos", photo);
+    });
+    try {
+      const res = await fetch(`${BASE_URL}/api/sellvehicle/add`, {
+        method: "POST",
+        body: formData
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSuccess("✅ Post your Ad successfully!");
+        setShowValidation(false);
+        setBrand("");
+        setModel("");
+        setTrim("");
+        setCondition("Used");
+        setYear("");
+        setMileage("");
+        setDescription("");
+        setPrice("");
+        setNegotiable(false);
+        setPhotos([null, null, null, null, null]);
+        setTimeout(() => {
+          setSuccess("");
+          navigate("/");
+        }, 2000); // Show alert for 2 seconds, then redirect
+      }
+    } catch (err) {
+      // Optionally show error message
+    }
   };
 
   return (
     <div className="max-w-2xl mx-auto px-2 sm:px-4 py-6 sm:py-8">
+      {/* Success notification */}
+      {success && (
+        <div className="fixed top-6 right-4 sm:right-8 z-50 bg-blue-600 text-white px-5 py-3 rounded-lg shadow-lg font-semibold text-base transition-all animate-slide-in w-[90vw] max-w-xs sm:max-w-sm"
+          style={{ boxShadow: "0 4px 24px rgba(0,0,0,0.15)" }}>
+          <span role="alert">{success}</span>
+        </div>
+      )}
       <h1 className="text-xl sm:text-2xl font-bold mb-4">Fill in the details</h1>
       <div className="flex flex-col sm:flex-row gap-2 mb-4 items-center">
         <div className="flex items-center gap-2">
           <span className="text-green-700 font-semibold">{location}</span>
-          <button className="text-blue-600 underline text-xs">Change</button>
+          <button
+            className="text-blue-600 underline text-xs"
+            onClick={() => setShowLocationModal(true)}
+          >
+            Change
+          </button>
         </div>
         <div className="flex items-center gap-2">
           <span className="text-green-700 font-semibold">{category}</span>
@@ -80,6 +210,75 @@ export default function SellThreewheel() {
           </button>
         </div>
       </div>
+      {/* Location Change Modal */}
+      {showLocationModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white rounded-lg shadow-lg p-6 w-full max-w-3xl mx-auto flex flex-col sm:flex-row gap-0">
+            {/* Left: Districts */}
+            <div className="w-full sm:w-1/2 border-r pr-4">
+              <h4 className="text-lg font-semibold mb-2 text-blue-700">Select City or Division</h4>
+              <ul className="space-y-1">
+                {locations.map(loc => (
+                  <li key={loc.district}>
+                    <button
+                      className={`w-full text-left px-2 py-2 rounded hover:bg-blue-50 font-semibold text-blue-700 transition-all flex justify-between items-center ${
+                        selectedDistrict === loc.district ? "bg-blue-100" : ""
+                      }`}
+                      onClick={() => {
+                        setSelectedDistrict(loc.district);
+                        setDistrict(loc.district);
+                      }}
+                    >
+                      <span>{loc.district}</span>
+                      <span className="text-gray-400">{'>'}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            </div>
+            {/* Right: Sublocations */}
+            <div className="w-full sm:w-1/2 pl-4">
+              <h4 className="text-lg font-semibold mb-2 text-blue-700">
+                {selectedDistrict
+                  ? `Select a local area within ${selectedDistrict}`
+                  : "Select a local area"}
+              </h4>
+              {selectedDistrict ? (
+                <>
+                  <div className="mb-2 font-semibold text-gray-700">Popular areas</div>
+                  <ul className="space-y-1 mb-4">
+                    {locations
+                      .find(loc => loc.district === selectedDistrict)
+                      ?.sublocations?.map(sub => (
+                        <li key={sub}>
+                          <button
+                            className="w-full text-left px-2 py-2 rounded hover:bg-green-50 font-semibold text-green-700 transition-all"
+                            onClick={() => {
+                              setSubLocation(sub);
+                              setLocation(`${selectedDistrict}, ${sub}`);
+                              setShowLocationModal(false);
+                              setSelectedDistrict(null);
+                            }}
+                          >
+                            {sub}
+                          </button>
+                        </li>
+                      ))}
+                  </ul>
+                </>
+              ) : (
+                <div className="text-gray-500 text-sm">Select a district to see areas</div>
+              )}
+              <button
+                onClick={() => setShowLocationModal(false)}
+                className="bg-gray-200 text-gray-700 px-4 py-2 rounded hover:bg-gray-300 transition-all font-semibold mt-4"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Category Change Modal */}
       {showCategoryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
@@ -128,32 +327,34 @@ export default function SellThreewheel() {
       <form className="space-y-4" onSubmit={handleSubmit}>
         <div>
           <label className="block text-sm font-medium mb-1">Brand</label>
-          <select
-            value={brand}
-            onChange={e => setBrand(e.target.value)}
-            className={`border rounded px-3 py-2 w-full ${showValidation && !brand ? "border-red-500" : ""}`}
-          >
-            <option value="">Brand</option>
-            {brands.map((b) => (
-              <option key={b} value={b}>{b}</option>
-            ))}
-          </select>
+          <Select
+            options={brands.map(b => ({ value: b, label: b }))}
+            value={brand ? { value: brand, label: brand } : null}
+            onChange={option => {
+              setBrand(option ? option.value : "");
+              setModel(""); // Reset model when brand changes
+            }}
+            isClearable
+            placeholder="Brand"
+            classNamePrefix="react-select"
+            className={showValidation && !brand ? "border-red-500" : ""}
+          />
           {showValidation && !brand && (
             <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
           )}
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Model</label>
-          <select
-            value={model}
-            onChange={e => setModel(e.target.value)}
-            className={`border rounded px-3 py-2 w-full ${showValidation && !model ? "border-red-500" : ""}`}
-          >
-            <option value="">Model</option>
-            {models.map((m) => (
-              <option key={m} value={m}>{m}</option>
-            ))}
-          </select>
+          <Select
+            options={models.map(m => ({ value: m, label: m }))}
+            value={model ? { value: model, label: model } : null}
+            onChange={option => setModel(option ? option.value : "")}
+            isClearable
+            isDisabled={!brand}
+            placeholder="Model"
+            classNamePrefix="react-select"
+            className={showValidation && !model ? "border-red-500" : ""}
+          />
           {showValidation && !model && (
             <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
           )}
@@ -203,13 +404,20 @@ export default function SellThreewheel() {
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Price (Rs)</label>
-          <input
-            type="text"
-            value={price}
-            onChange={e => setPrice(e.target.value)}
-            className={`border rounded px-3 py-2 w-full ${showValidation && (!price || isNaN(price) || Number(price) <= 0) ? "border-red-500" : ""}`}
-            placeholder="Pick a good price"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={formatNumberWithCommas(price)}
+              onChange={e => {
+                // Remove commas and non-numeric chars before storing
+                const raw = e.target.value.replace(/,/g, "").replace(/[^0-9]/g, "");
+                setPrice(raw);
+              }}
+              className={`border rounded px-3 py-2 w-full pr-10 ${showValidation && (!price || isNaN(price) || Number(price) <= 0) ? "border-red-500" : ""}`}
+              placeholder="Pick a good price"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">Rs</span>
+          </div>
           {showValidation && (!price || isNaN(price) || Number(price) <= 0) && (
             <div className="text-xs text-red-500 mt-1">You must fill out this field with a valid price.</div>
           )}
@@ -237,14 +445,21 @@ export default function SellThreewheel() {
           )}
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Mileage (km)</label>
-          <input
-            type="text"
-            value={mileage}
-            onChange={e => setMileage(e.target.value)}
-            className={`border rounded px-3 py-2 w-full ${showValidation && (!mileage || isNaN(mileage) || Number(mileage) < 0) ? "border-red-500" : ""}`}
-            placeholder="Enter the mileage of the vehicle."
-          />
+          <label className="block text-sm font-medium mb-1">Mileage (Km)</label>
+          <div className="relative">
+            <input
+              type="text"
+              value={formatNumberWithCommas(mileage)}
+              onChange={e => {
+                // Remove commas and non-numeric chars before storing
+                const raw = e.target.value.replace(/,/g, "").replace(/[^0-9]/g, "");
+                setMileage(raw);
+              }}
+              className={`border rounded px-3 py-2 w-full pr-10 ${showValidation && (!mileage || isNaN(mileage) || Number(mileage) < 0) ? "border-red-500" : ""}`}
+              placeholder="Enter the mileage of the vehicle."
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm pointer-events-none">km</span>
+          </div>
           {showValidation && (!mileage || isNaN(mileage) || Number(mileage) < 0) && (
             <div className="text-xs text-red-500 mt-1">Must be a valid mileage.</div>
           )}

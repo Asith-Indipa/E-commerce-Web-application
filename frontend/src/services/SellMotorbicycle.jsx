@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Select from "react-select";
+import { BASE_URL } from "../util/api.js";
 
 const bikeTypes = [
   "E-bikes",
@@ -41,7 +42,7 @@ export default function SellMotorbicycle() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/vehiclecategory/all");
+        const res = await fetch(`${BASE_URL}/api/vehiclecategory/all`);
         const data = await res.json();
         setCategories(data);
       } catch {
@@ -55,7 +56,7 @@ export default function SellMotorbicycle() {
     // Fetch brands for Motorbikes from vehiclemodelbrand table
     const fetchBrands = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/vehiclemodelbrand/all");
+        const res = await fetch(`${BASE_URL}/api/vehiclemodelbrand/all`);
         const data = await res.json();
         // Filter brands for Motorbikes category and remove duplicates
         const motorBrands = Array.from(
@@ -77,7 +78,7 @@ export default function SellMotorbicycle() {
     // Fetch models for selected brand in Motorbikes category
     const fetchModels = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/vehiclemodelbrand/all");
+        const res = await fetch(`${BASE_URL}/api/vehiclemodelbrand/all`);
         const data = await res.json();
         const motorModels = Array.from(
           new Set(
@@ -102,7 +103,7 @@ export default function SellMotorbicycle() {
     // Fetch locations from backend
     const fetchLocations = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/location/all");
+        const res = await fetch(`${BASE_URL}/api/location/all`);
         const data = await res.json();
         const arr = Object.entries(data).map(([district, sublocations]) => ({
           district,
@@ -130,6 +131,8 @@ export default function SellMotorbicycle() {
     const yearValid = year && !isNaN(year) && Number(year) >= 1900;
     const mileageValid = mileage && !isNaN(mileage) && Number(mileage) >= 0;
     const engineValid = engine && !isNaN(engine) && Number(engine) >= 1;
+    // Generate title from brand and model if not provided
+    const title = brand && model ? `${brand} ${model}` : "";
     if (
       !bikeType ||
       !condition ||
@@ -145,6 +148,7 @@ export default function SellMotorbicycle() {
       return;
     }
     const formData = new FormData();
+    formData.append("title", title); // Add title to formData
     formData.append("bikeType", bikeType);
     formData.append("condition", condition);
     formData.append("brand", brand);
@@ -164,7 +168,7 @@ export default function SellMotorbicycle() {
       if (photo) formData.append("photos", photo);
     });
     try {
-      const res = await fetch("http://localhost:5000/api/sellvehicle/add", {
+      const res = await fetch(`${BASE_URL}/api/sellvehicle/add`, {
         method: "POST",
         body: formData
       });

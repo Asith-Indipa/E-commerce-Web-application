@@ -141,6 +141,8 @@ export default function SellCars() {
     const yearValid = year && !isNaN(year) && Number(year) >= 1886;
     const mileageValid = mileage && !isNaN(mileage) && Number(mileage) >= 0;
     const engineValid = engine && !isNaN(engine) && Number(engine) >= 1;
+    // Generate title from brand and model if not provided
+    const title = brand && model ? `${brand} ${model}` : "";
     if (
       !brand ||
       !model ||
@@ -156,6 +158,7 @@ export default function SellCars() {
       return;
     }
     const formData = new FormData();
+    formData.append("title", title); // Add title to formData
     formData.append("brand", brand);
     formData.append("model", model);
     formData.append("trim", trim);

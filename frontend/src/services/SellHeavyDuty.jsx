@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Select from "react-select"; // Add this import
+import { BASE_URL } from "../util/api.js";
 
 const conditions = ["Used", "Reconditioned", "New"];
 const vehicleTypes = [
@@ -57,7 +58,7 @@ export default function SellHeavyDuty() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/vehiclecategory/all");
+        const res = await fetch(`${BASE_URL}/api/vehiclecategory/all`);
         const data = await res.json();
         setCategories(data);
       } catch {
@@ -71,7 +72,7 @@ export default function SellHeavyDuty() {
     // Fetch brands for Heavy Duty from vehiclemodelbrands table
     const fetchBrands = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/vehiclemodelbrand/all");
+        const res = await fetch(`${BASE_URL}/api/vehiclemodelbrand/all`);
         const data = await res.json();
         // Filter brands for Heavy Duty category and remove duplicates
         const heavyBrands = Array.from(
@@ -93,7 +94,7 @@ export default function SellHeavyDuty() {
     // Fetch models for selected brand in Heavy Duty category
     const fetchModels = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/vehiclemodelbrand/all");
+        const res = await fetch(`${BASE_URL}/api/vehiclemodelbrand/all`);
         const data = await res.json();
         const heavyModels = Array.from(
           new Set(
@@ -118,7 +119,7 @@ export default function SellHeavyDuty() {
     // Fetch locations from backend
     const fetchLocations = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/location/all");
+        const res = await fetch(`${BASE_URL}/api/location/all`);
         const data = await res.json();
         const arr = Object.entries(data).map(([district, sublocations]) => ({
           district,
@@ -181,7 +182,7 @@ export default function SellHeavyDuty() {
       if (photo) formData.append("photos", photo);
     });
     try {
-      const res = await fetch("http://localhost:5000/api/sellvehicle/add", {
+      const res = await fetch(`${BASE_URL}/api/sellvehicle/add`, {
         method: "POST",
         body: formData
       });

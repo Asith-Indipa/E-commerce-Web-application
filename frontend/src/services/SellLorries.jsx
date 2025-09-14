@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Select from "react-select";
+import { BASE_URL } from "../util/api.js";
 
 const conditions = ["Used", "Reconditioned", "New"];
 
@@ -40,7 +41,7 @@ export default function SellLorries() {
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/vehiclecategory/all");
+        const res = await fetch(`${BASE_URL}/api/vehiclecategory/all`);
         const data = await res.json();
         setCategories(data);
       } catch {
@@ -54,7 +55,7 @@ export default function SellLorries() {
     // Fetch brands for Lorries & Trucks from vehiclemodelbrands table
     const fetchBrands = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/vehiclemodelbrand/all");
+        const res = await fetch(`${BASE_URL}/api/vehiclemodelbrand/all`);
         const data = await res.json();
         // Filter brands for Lorries & Trucks category and remove duplicates
         const lorryBrands = Array.from(
@@ -76,7 +77,7 @@ export default function SellLorries() {
     // Fetch models for selected brand in Lorries & Trucks category
     const fetchModels = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/vehiclemodelbrand/all");
+        const res = await fetch(`${BASE_URL}/api/vehiclemodelbrand/all`);
         const data = await res.json();
         const lorryModels = Array.from(
           new Set(
@@ -101,7 +102,7 @@ export default function SellLorries() {
     // Fetch locations from backend
     const fetchLocations = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/location/all");
+        const res = await fetch(`${BASE_URL}/api/location/all`);
         const data = await res.json();
         const arr = Object.entries(data).map(([district, sublocations]) => ({
           district,
@@ -128,6 +129,8 @@ export default function SellLorries() {
     const yearValid = year && !isNaN(year) && Number(year) >= 1900;
     const mileageValid = mileage && !isNaN(mileage) && Number(mileage) >= 0;
     const engineValid = engine && !isNaN(engine) && Number(engine) >= 1;
+    // Generate title from brand and model if not provided
+    const title = brand && model ? `${brand} ${model}` : "";
     if (
       !brand ||
       !model ||
@@ -141,6 +144,7 @@ export default function SellLorries() {
       return;
     }
     const formData = new FormData();
+    formData.append("title", title); // Add title to formData
     formData.append("brand", brand);
     formData.append("model", model);
     formData.append("trim", trim);
@@ -159,7 +163,7 @@ export default function SellLorries() {
       if (photo) formData.append("photos", photo);
     });
     try {
-      const res = await fetch("http://localhost:5000/api/sellvehicle/add", {
+      const res = await fetch(`${BASE_URL}/api/sellvehicle/add`, {
         method: "POST",
         body: formData
       });
