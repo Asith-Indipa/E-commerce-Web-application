@@ -114,6 +114,17 @@ router.get("/all", async (req, res) => {
   }
 });
 
+// GET endpoint to fetch vehicle details by id
+router.get('/details/:id', async (req, res) => {
+  try {
+    const vehicle = await SellVehicleDetails.findById(req.params.id);
+    if (!vehicle) return res.status(404).json({ error: "Not found" });
+    res.json(vehicle);
+  } catch (err) {
+    res.status(500).json({ error: "Server error" });
+  }
+});
+
 // DELETE endpoint to remove a vehicle and its images
 router.delete("/delete/:id", async (req, res) => {
   try {

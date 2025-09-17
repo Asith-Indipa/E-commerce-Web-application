@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Search } from "lucide-react"; // npm install lucide-react
+import { Search } from "lucide-react";
 
 export default function SearchBar() {
   const [search, setSearch] = useState("");
@@ -10,9 +10,9 @@ export default function SearchBar() {
   };
 
   return (
-    <div className="bg-white w-full flex justify-center py-2 sm:py-4 fixed top-16 left-0 right-0 z-50 shadow-lg">
+    <div className="flex justify-center py-4 fixed top-16 left-0 right-0 z-50">
       <form
-        className="relative flex w-full max-w-xs sm:max-w-xl px-2 sm:px-0"
+        className="relative flex w-full max-w-xl"
         onSubmit={handleSubmit}
       >
         <input
@@ -20,14 +20,14 @@ export default function SearchBar() {
           value={search}
           onChange={e => setSearch(e.target.value)}
           placeholder="Search vehicles, brands, models..."
-          className="w-full pl-10 pr-12 py-2 sm:py-3 rounded-full border border-blue-300 bg-gradient-to-r from-blue-50 to-blue-100 shadow focus:outline-none focus:ring-2 focus:ring-blue-400 text-gray-700 transition-all duration-200 text-sm sm:text-base"
+          className="w-full pl-10 pr-12 py-3 rounded-full border-2 border-blue-400 outline-none focus:border-blue-600 focus:ring-2 focus:ring-blue-300 shadow-lg text-gray-700 transition-all duration-200 text-base"
         />
-        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-500">
+        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-blue-500">
           <Search size={20} />
         </span>
         <button
           type="submit"
-          className="absolute right-2 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-2 shadow transition-all duration-200"
+          className="absolute right-3 top-1/2 -translate-y-1/2 bg-blue-600 hover:bg-blue-700 text-white rounded-full p-2 shadow transition-all duration-200"
         >
           <Search size={18} />
         </button>
