@@ -3,8 +3,9 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Menu, X } from "lucide-react"; // npm install lucide-react
 
-export default function Header() {
+export default function Header({ onMenuToggle }) {
   const [isOpen, setIsOpen] = useState(false);
+  const userName = localStorage.getItem("userName");
 
   const menuItems = [
     { name: "Home", path: "/" },
@@ -13,6 +14,12 @@ export default function Header() {
     { name: "Contact", path: "/contact" },
     { name: "Admin Dashboard", path: "/admin/dashboard" },
   ];
+
+  // Notify parent when menu is toggled
+  const handleMenuToggle = () => {
+    setIsOpen(!isOpen);
+    if (onMenuToggle) onMenuToggle(!isOpen);
+  };
 
   return (
     <header className="bg-white shadow-md fixed top-0 left-0 right-0 z-50">
@@ -36,26 +43,40 @@ export default function Header() {
             ))}
           </nav>
 
-          {/* Auth Buttons */}
+          {/* Auth/Profile Buttons - Desktop */}
           <div className="hidden md:flex space-x-2 sm:space-x-4">
-            <Link
-              to="/login"
-              className="px-2 sm:px-4 py-1 sm:py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition text-sm sm:text-base"
-            >
-              Login
-            </Link>
-            <Link
-              to="/register"
-              className="px-2 sm:px-4 py-1 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm sm:text-base"
-            >
-              Sign Up
-            </Link>
+            {!userName ? (
+              <>
+                <Link
+                  to="/login"
+                  className="px-2 sm:px-4 py-1 sm:py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition text-sm sm:text-base"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/register"
+                  className="px-2 sm:px-4 py-1 sm:py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-sm sm:text-base"
+                >
+                  Sign Up
+                </Link>
+              </>
+            ) : (
+              <Link
+                to="/profile"
+                className="flex items-center gap-2 px-4 py-2 bg-blue-100 rounded hover:bg-blue-200 font-semibold text-blue-700"
+              >
+                <span>{userName}</span>
+                <span className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">
+                  {userName.charAt(0).toUpperCase()}
+                </span>
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu Button */}
           <button
             className="md:hidden p-2"
-            onClick={() => setIsOpen(!isOpen)}
+            onClick={handleMenuToggle}
           >
             {isOpen ? <X size={24} /> : <Menu size={24} />}
           </button>
@@ -76,20 +97,35 @@ export default function Header() {
                 {item.name}
               </Link>
             ))}
-            <Link
-              to="/login"
-              onClick={() => setIsOpen(false)}
-              className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition text-base"
-            >
-              Login
-            </Link>
-            <Link
-              to="/register"
-              onClick={() => setIsOpen(false)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-base"
-            >
-              Sign Up
-            </Link>
+            {!userName ? (
+              <>
+                <Link
+                  to="/login"
+                  onClick={() => setIsOpen(false)}
+                  className="px-4 py-2 border border-blue-600 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition text-base"
+                >
+                  Login
+                </Link>
+                <Link
+                  to="/register"
+                  onClick={() => setIsOpen(false)}
+                  className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-base"
+                >
+                  Sign Up
+                </Link>
+              </>
+            ) : (
+              <Link
+                to="/profile"
+                onClick={() => setIsOpen(false)}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-100 rounded hover:bg-blue-200 font-semibold text-blue-700"
+              >
+                <span>{userName}</span>
+                <span className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">
+                  {userName.charAt(0).toUpperCase()}
+                </span>
+              </Link>
+            )}
           </nav>
         </div>
       )}
