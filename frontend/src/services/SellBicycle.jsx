@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom"; // Add this import
 import { BASE_URL } from "../util/api.js"; // Add this import
+import { fetchUserLocation } from "../util/userLocation.js"; // Add this import
 import Select from "react-select"; // Add this import
 
 const conditions = ["Used", "Reconditioned", "New"];
@@ -82,6 +83,9 @@ export default function SellBicycle() {
       }
     };
     fetchLocations();
+
+    // Fetch user's location and set as default
+    fetchUserLocation(setLocation, setDistrict, setSubLocation);
   }, []);
 
   const handlePhotoChange = (idx, file) => {
@@ -112,9 +116,14 @@ export default function SellBicycle() {
     photos.forEach((photo) => {
       if (photo) formData.append("photos", photo);
     });
+    const token = localStorage.getItem("token"); // Get JWT token
+
     try {
       const res = await fetch(`${BASE_URL}/api/sellvehicle/add`, {
         method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}` // Add JWT token
+        },
         body: formData
       });
       const data = await res.json();

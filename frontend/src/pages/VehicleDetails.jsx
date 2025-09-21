@@ -57,12 +57,12 @@ export default function VehicleDetails() {
 
   // List of fields to exclude from details
   const excludeFields = [
-    "_id", "photos", "createdAt", "__v", "description", "price", "negotiable", "sellerName", "phone", "whatsapp", "title", "district", "subLocation", "category"
+    "_id", "photos", "createdAt", "__v", "description", "price", "negotiable", "sellerName", "phone", "whatsapp", "title", "district", "subLocation", "category", "user"
   ];
 
   // Get all details except excluded fields
   const details = Object.entries(vehicle || {})
-    .filter(([key, value]) => value && !excludeFields.includes(key));
+    .filter(([key, value]) => value && !excludeFields.includes(key) && typeof value !== 'object');
 
   if (loading) {
     return <div className="flex justify-center items-center h-96">Loading...</div>;
@@ -159,18 +159,20 @@ export default function VehicleDetails() {
             <div className="bg-blue-50 rounded-xl shadow p-4 mb-2 border border-blue-200">
               <div className="font-semibold text-gray-800 mb-2 flex items-center gap-2">
                 <span className="bg-blue-600 text-white px-2 py-1 rounded-full text-xs font-bold">Seller</span>
-                <span className="text-blue-700">{vehicle.sellerName || "Seller"}</span>
+                <span className="text-blue-700">{vehicle.user && typeof vehicle.user === 'object' && vehicle.user.name ? String(vehicle.user.name) : "Seller"}</span>
               </div>
               <div className="flex flex-col gap-2">
-                <a href={`tel:${vehicle.phone || ""}`} className="bg-green-600 text-white rounded px-3 py-2 font-bold flex items-center gap-2 hover:bg-green-700 transition-all">
-                  <span>Call seller</span>
-                  <span>{vehicle.phone}</span>
-                </a>
-                {vehicle.whatsapp && (
-                  <a href={`https://wa.me/${vehicle.whatsapp}`} target="_blank" rel="noopener noreferrer"
-                    className="bg-green-500 text-white rounded px-3 py-2 font-bold flex items-center gap-2 hover:bg-green-600 transition-all">
-                    WhatsApp
-                  </a>
+                {vehicle.user && typeof vehicle.user === 'object' && vehicle.user.phone && (
+                  <>
+                    <a href={`tel:${String(vehicle.user.phone)}`} className="bg-green-600 text-white rounded px-3 py-2 font-bold flex items-center gap-2 hover:bg-green-700 transition-all">
+                      <span>Call seller</span>
+                      <span>{String(vehicle.user.phone)}</span>
+                    </a>
+                    <a href={`https://wa.me/${String(vehicle.user.phone)}`} target="_blank" rel="noopener noreferrer"
+                      className="bg-green-500 text-white rounded px-3 py-2 font-bold flex items-center gap-2 hover:bg-green-600 transition-all">
+                      WhatsApp
+                    </a>
+                  </>
                 )}
               </div>
             </div>
@@ -194,7 +196,7 @@ export default function VehicleDetails() {
             {details.map(([key, value]) => (
               <div key={key} className="flex gap-2">
                 <span className="font-semibold text-blue-700">{formatLabel(key)}:</span>
-                <span className="text-gray-800">{value}</span>
+                <span className="text-gray-800">{typeof value === 'string' ? value : String(value)}</span>
               </div>
             ))}
           </div>

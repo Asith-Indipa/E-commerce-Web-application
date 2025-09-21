@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { BASE_URL } from "../util/api.js"; // <-- If util is in project root util/api.jsrc/util/api.js
+import { fetchUserLocation } from "../util/userLocation.js"; // Add this import
 import Select from "react-select"; // Add this import
 
 const conditions = ["New", "Reconditioned", "Used"];
@@ -99,6 +100,9 @@ export default function SellCars() {
       }
     };
     fetchLocations();
+
+    // Fetch user's location and set as default
+    fetchUserLocation(setLocation, setDistrict, setSubLocation);
   }, []);
 
   // Fetch models for selected brand
@@ -178,9 +182,14 @@ export default function SellCars() {
     photos.forEach((photo) => {
       if (photo) formData.append("photos", photo);
     });
+    const token = localStorage.getItem("token"); // Get JWT token
+
     try {
       const res = await fetch(`${BASE_URL}/api/sellvehicle/add`, {
         method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}` // Add JWT token
+        },
         body: formData
       });
       const data = await res.json();
@@ -207,9 +216,11 @@ export default function SellCars() {
           setSuccess("");
           navigate("/");
         }, 2000); // Show alert for 2 seconds, then redirect
+      } else {
+        setError(data.error || "Failed to save vehicle details");
       }
     } catch (err) {
-      // Optionally show error message
+      setError("Network error");
     }
   };
 

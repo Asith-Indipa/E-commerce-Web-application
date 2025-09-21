@@ -121,4 +121,4 @@ router.delete("/me", authMiddleware, async (req, res) => {
   }
 });
 
-module.exports = router;
+module.exports = { router, authMiddleware };

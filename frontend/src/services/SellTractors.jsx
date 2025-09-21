@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import Select from "react-select"; // Add this import
 import { BASE_URL } from "../util/api.js";
+import { fetchUserLocation } from "../util/userLocation.js";
 
 const conditions = ["Used", "Reconditioned", "New"];
 
@@ -81,6 +82,9 @@ export default function SellTractors() {
     fetchCategories();
     fetchLocations();
     fetchBrands();
+
+    // Fetch user's location and set as default
+    fetchUserLocation(setLocation, setDistrict, setSubLocation);
   }, []);
 
   useEffect(() => {
@@ -148,9 +152,14 @@ export default function SellTractors() {
     photos.forEach((photo) => {
       if (photo) formData.append("photos", photo);
     });
+    const token = localStorage.getItem("token"); // Get JWT token
+
     try {
       const res = await fetch(`${BASE_URL}/api/sellvehicle/add`, {
         method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}` // Add JWT token
+        },
         body: formData
       });
       const data = await res.json();

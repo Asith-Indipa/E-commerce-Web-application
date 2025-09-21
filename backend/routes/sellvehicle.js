@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const { authMiddleware } = require("./auth");
 
 // Multer config
 const storage = multer.diskStorage({
@@ -38,14 +39,15 @@ const sellVehicleSchema = new mongoose.Schema({
   category: String,
   district: String,
   subLocation: String,
+  user: { type: mongoose.Schema.Types.ObjectId, ref: "User", required: true }, // Add user field
   createdAt: { type: Date, default: Date.now }
 });
 
 // Create model
 const SellVehicleDetails = mongoose.model("SellVehicleDetails", sellVehicleSchema);
 
-// POST endpoint to add a vehicle with image upload
-router.post("/add", upload.array("photos", 5), async (req, res) => {
+// POST endpoint to add a vehicle with image upload and user id
+router.post("/add", authMiddleware, upload.array("photos", 5), async (req, res) => {
   try {
     console.log("Received body:", req.body); // Debug: log incoming fields
     console.log("Received files:", req.files); // Debug: log incoming files
@@ -74,6 +76,7 @@ router.post("/add", upload.array("photos", 5), async (req, res) => {
     const photoPaths = photoFiles.map(file => file.filename);
     // Convert price to number (remove commas if present)
     const numericPrice = typeof price === "string" ? Number(price.replace(/,/g, "")) : price;
+    const userId = req.userId; // Get user id from JWT
     const vehicle = new SellVehicleDetails({
       bikeType,      // Add this field
       brand,
@@ -94,7 +97,8 @@ router.post("/add", upload.array("photos", 5), async (req, res) => {
       negotiable,
       category,
       district,
-      subLocation
+      subLocation,
+      user: userId // Add user field
     });
     await vehicle.save();
     res.status(201).json({ success: true, vehicle });
@@ -104,10 +108,10 @@ router.post("/add", upload.array("photos", 5), async (req, res) => {
   }
 });
 
-// GET endpoint to fetch all vehicles
+// GET endpoint to fetch all vehicles with user info
 router.get("/all", async (req, res) => {
   try {
-    const vehicles = await SellVehicleDetails.find().sort({ createdAt: -1 });
+    const vehicles = await SellVehicleDetails.find().sort({ createdAt: -1 }).populate("user", "name email");
     res.json(vehicles);
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -117,7 +121,7 @@ router.get("/all", async (req, res) => {
 // GET endpoint to fetch vehicle details by id
 router.get('/details/:id', async (req, res) => {
   try {
-    const vehicle = await SellVehicleDetails.findById(req.params.id);
+    const vehicle = await SellVehicleDetails.findById(req.params.id).populate("user", "name email phone");
     if (!vehicle) return res.status(404).json({ error: "Not found" });
     res.json(vehicle);
   } catch (err) {

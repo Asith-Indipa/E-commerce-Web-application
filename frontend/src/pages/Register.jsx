@@ -58,9 +58,9 @@ export default function Register() {
       });
       const data = await res.json();
       if (data.success) {
-        localStorage.setItem("userName", name); // Store user name
-        localStorage.setItem("userEmail", email); // Store user email
-        navigate("/"); // Redirect to home
+        // localStorage.setItem("userName", name); // Store user name
+        // localStorage.setItem("userEmail", email); // Store user email
+        navigate("/login"); // Redirect to home
       } else {
         setError(data.error || "Registration failed");
       }
