@@ -17,6 +17,9 @@ export default function Profile() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [phone, setPhone] = useState("");
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [profileImage, setProfileImage] = useState("");
+  const [profileImageFile, setProfileImageFile] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
 
   useEffect(() => {
     fetch(`${BASE_URL}/api/location/all`)
@@ -48,6 +51,7 @@ export default function Profile() {
           setLocation(data.user.location || "");
           setSubLocation(data.user.subLocation || "");
           setPhone(data.user.phone || "");
+          setProfileImage(data.user.profileImage || "");
         }
       });
   }, []);
@@ -112,6 +116,64 @@ export default function Profile() {
       }
     } catch {
       setError("Server error. Please try again.");
+    }
+  };
+
+  const handleImageChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setProfileImageFile(file);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setImagePreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleImageUpload = async () => {
+    if (!profileImageFile) {
+      setError("Please select an image to upload");
+      return;
+    }
+
+    const token = localStorage.getItem("token");
+    const formData = new FormData();
+    formData.append("profileImage", profileImageFile);
+
+    try {
+      const res = await fetch(`${BASE_URL}/api/auth/upload-profile-image`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setProfileImage(data.profileImage);
+        // Persist to localStorage so other components can access immediately
+        try {
+          localStorage.setItem("profileImage", data.profileImage || "");
+        } catch (_) {}
+        // Notify listeners (e.g., Header) that the profile image changed
+        try {
+          window.dispatchEvent(
+            new CustomEvent("profile-image-updated", {
+              detail: { profileImage: data.profileImage },
+            })
+          );
+        } catch (_) {}
+        setImagePreview("");
+        setProfileImageFile(null);
+        setSuccess("Profile image updated successfully!");
+        setTimeout(() => setSuccess(""), 3000);
+      } else {
+        setError(data.error || "Failed to upload image");
+      }
+    } catch (err) {
+      setError("Network error. Please try again.");
     }
   };
 
@@ -205,6 +267,59 @@ export default function Profile() {
           <>
             <h2 className="text-xl font-bold mb-6">Settings</h2>
             <form className="space-y-6 max-w-lg" onSubmit={handleUpdateDetails}>
+              <div>
+                <div className="font-semibold mb-4">Profile Image</div>
+                <div className="flex items-center space-x-4 mb-4">
+                  <div className="relative">
+                    {profileImage ? (
+                      <img
+                        src={`${BASE_URL}/profile_image/${profileImage}`}
+                        alt="Profile"
+                        className="w-20 h-20 rounded-full object-cover border-2 border-gray-300"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 rounded-full bg-gray-300 flex items-center justify-center border-2 border-gray-300">
+                        <span className="text-gray-600 text-2xl font-semibold">
+                          {name ? name.charAt(0).toUpperCase() : 'U'}
+                        </span>
+                      </div>
+                    )}
+                    {imagePreview && (
+                      <div className="absolute inset-0 rounded-full overflow-hidden">
+                        <img
+                          src={imagePreview}
+                          alt="Preview"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    {/* Hide native file input to avoid 'No file chosen' text */}
+                    <input
+                      id="profileFileInput"
+                      type="file"
+                      accept="image/*"
+                      onChange={handleImageChange}
+                      className="hidden"
+                    />
+                    <label
+                      htmlFor="profileFileInput"
+                      className="inline-block mr-3 px-4 py-2 rounded-full text-sm font-semibold bg-blue-50 text-blue-700 hover:bg-blue-100 cursor-pointer"
+                    >
+                      Choose File
+                    </label>
+                    <button
+                      type="button"
+                      onClick={handleImageUpload}
+                      disabled={!profileImageFile}
+                      className="mt-2 px-4 py-2 bg-blue-600 text-white rounded-full text-sm font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    >
+                      Upload Image
+                    </button>
+                  </div>
+                </div>
+              </div>
               <div>
                 <div className="font-semibold mb-2">Change details</div>
                 <div className="mb-2 text-gray-700">

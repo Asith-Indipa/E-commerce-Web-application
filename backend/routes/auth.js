@@ -2,7 +2,43 @@ const express = require("express");
 const router = express.Router();
 const User = require("../models/User");
 const bcrypt = require("bcrypt");
+const mongoose = require("mongoose");
 const jwt = require("jsonwebtoken");
+const multer = require("multer");
+const path = require("path");
+const fs = require("fs");
+
+// Multer config for profile images
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadPath = path.join(__dirname, "../profile_image");
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    // Generate unique filename with timestamp
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'profile-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: function (req, file, cb) {
+    // Check if file is an image
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed!'), false);
+    }
+  }
+});
 
 router.post("/register", async (req, res) => {
   try {
@@ -33,6 +69,9 @@ router.post("/login", async (req, res) => {
     if (!user) {
       return res.json({ success: false, error: "Invalid credentials." });
     }
+    if (!user.isActive) {
+      return res.json({ success: false, error: "Account is deactivated. Please contact support." });
+    }
     const match = await bcrypt.compare(password, user.password);
     if (!match) {
       return res.json({ success: false, error: "Invalid credentials." });
@@ -61,6 +100,27 @@ function authMiddleware(req, res, next) {
     next();
   } catch {
     return res.status(401).json({ success: false, error: "Invalid token" });
+  }
+}
+
+// Admin guard
+async function isAdmin(req, res, next) {
+  try {
+    const u = await User.findById(req.userId);
+    if (!u) return res.status(401).json({ success: false, error: "User not found" });
+    if (u.role !== 'admin') {
+      // Bootstrap: if there is no admin in the system, promote current user
+      const adminCount = await User.countDocuments({ role: 'admin' });
+      if (adminCount === 0) {
+        u.role = 'admin';
+        await u.save();
+        return next();
+      }
+      return res.status(403).json({ success: false, error: "Admin access required" });
+    }
+    next();
+  } catch (e) {
+    return res.status(500).json({ success: false, error: "Authorization check failed" });
   }
 }
 
@@ -118,6 +178,142 @@ router.delete("/me", authMiddleware, async (req, res) => {
     res.json({ success: true });
   } catch {
     res.json({ success: false, error: "Failed to delete account" });
+  }
+});
+
+// Get all users (admin endpoint)
+router.get("/all", authMiddleware, isAdmin, async (req, res) => {
+  try {
+    const users = await User.find({ isActive: true }).select("-password").sort({ createdAt: -1 });
+    res.json({ success: true, users });
+  } catch (error) {
+    res.json({ success: false, error: "Failed to fetch users" });
+  }
+});
+
+// Admin: create a new user with role
+router.post('/admin/create-user', authMiddleware, isAdmin, async (req, res) => {
+  try {
+    const { name, email, phone, location, subLocation, password, role } = req.body;
+    if (!name || !email || !phone || !location || !subLocation || !password) {
+      return res.json({ success: false, error: 'All fields are required.' });
+    }
+    const existing = await User.findOne({ email });
+    if (existing) {
+      return res.json({ success: false, error: 'Email already registered.' });
+    }
+    const user = new User({
+      name,
+      email,
+      phone,
+      location,
+      subLocation,
+      password,
+      role: role === 'admin' ? 'admin' : 'user'
+    });
+    await user.save();
+    const created = user.toObject();
+    delete created.password;
+    res.json({ success: true, user: created });
+  } catch (e) {
+    res.json({ success: false, error: 'Failed to create user' });
+  }
+});
+
+// Admin: delete a user (users collection only)
+router.delete('/admin/user/:id', authMiddleware, isAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+    // Prevent deleting admins
+    if (user.role === 'admin') {
+      return res.status(403).json({ success: false, error: 'Cannot delete an admin account' });
+    }
+    // Prevent deleting yourself
+    if (String(req.userId) === String(id)) {
+      return res.status(403).json({ success: false, error: 'You cannot delete your own account' });
+    }
+
+    // 1) Find related sellvehicledetails documents to remove images
+    try {
+      const objectId = new mongoose.Types.ObjectId(id);
+      const vehicles = await mongoose.connection
+        .collection('sellvehicledetails')
+        .find({ user: objectId })
+        .toArray();
+
+      for (const v of vehicles) {
+        const photos = Array.isArray(v.photos) ? v.photos : [];
+        for (const filename of photos) {
+          try {
+            const filePath = path.join(__dirname, "../sellvehicle", filename);
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+          } catch (_) {}
+        }
+      }
+
+      // 2) Delete the vehicle documents
+      await mongoose.connection
+        .collection('sellvehicledetails')
+        .deleteMany({ user: objectId });
+    } catch (_) {
+      // Ignore errors from vehicle cleanup to not block user deletion
+    }
+
+    // 3) Attempt to remove user's profile image file if present
+    if (user.profileImage) {
+      try {
+        const imgPath = path.join(__dirname, "../profile_image", user.profileImage);
+        if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
+      } catch (_) {}
+    }
+
+    // 4) Soft delete the user (do not remove the document)
+    user.isActive = false;
+    user.deletedAt = new Date();
+    // Optionally clear profileImage reference after file removal
+    user.profileImage = null;
+    await user.save();
+
+    return res.json({ success: true });
+  } catch (e) {
+    return res.status(500).json({ success: false, error: 'Failed to delete user' });
+  }
+});
+
+// Upload profile image
+router.post("/upload-profile-image", authMiddleware, upload.single('profileImage'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.json({ success: false, error: "No image file provided" });
+    }
+
+    const userId = req.userId;
+    const imagePath = req.file.filename;
+
+    // Update user with new profile image
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { profileImage: imagePath },
+      { new: true }
+    ).select("-password");
+
+    if (!user) {
+      return res.json({ success: false, error: "User not found" });
+    }
+
+    res.json({ 
+      success: true, 
+      message: "Profile image uploaded successfully",
+      profileImage: imagePath,
+      user: user
+    });
+  } catch (error) {
+    console.error("Profile image upload error:", error);
+    res.json({ success: false, error: "Failed to upload profile image" });
   }
 });
 

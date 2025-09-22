@@ -7,8 +7,12 @@ const userSchema = new mongoose.Schema({
   phone: { type: String, required: true },
   location: { type: String, required: true },
   subLocation: { type: String, required: true },
-  password: { type: String, required: true }
-});
+  password: { type: String, required: true },
+  profileImage: { type: String, default: null },
+  role: { type: String, enum: ['admin', 'user'], default: 'user' },
+  isActive: { type: Boolean, default: true },
+  deletedAt: { type: Date, default: null }
+}, { timestamps: true });
 
 // Hash password before saving
 userSchema.pre("save", async function (next) {

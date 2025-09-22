@@ -1,10 +1,18 @@
 // frontend/src/components/Header.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Menu, X } from "lucide-react"; // npm install lucide-react
+import { BASE_URL } from "../util/api.js";
 
 export default function Header({ onMenuToggle }) {
   const [isOpen, setIsOpen] = useState(false);
+  const [profileImage, setProfileImage] = useState(() => {
+    try {
+      return localStorage.getItem("profileImage") || "";
+    } catch (_) {
+      return "";
+    }
+  });
   const userName = localStorage.getItem("userName");
 
   const menuItems = [
@@ -12,8 +20,41 @@ export default function Header({ onMenuToggle }) {
     { name: "Buy Vehicles", path: "/vehicles" },
     { name: "Sell Vehicle", path: "/sell" },
     { name: "Contact", path: "/contact" },
-    { name: "Admin Dashboard", path: "/admin/dashboard" },
   ];
+
+  // Fetch user profile image when component mounts
+  useEffect(() => {
+    const token = localStorage.getItem("token");
+    if (!token || !userName) return;
+    
+    fetch(`${BASE_URL}/api/auth/me`, {
+      method: "GET",
+      headers: {
+        "Authorization": `Bearer ${token}`
+      }
+    })
+      .then(res => res.json())
+      .then(data => {
+        if (data.success && data.user) {
+          const img = data.user.profileImage || "";
+          setProfileImage(img);
+          try { localStorage.setItem("profileImage", img); } catch (_) {}
+        }
+      })
+      .catch(err => {
+        console.error("Error fetching user data:", err);
+      });
+  }, [userName]);
+
+  // React to profile image updates dispatched from Profile.jsx
+  useEffect(() => {
+    const onProfileImageUpdated = (e) => {
+      const img = e?.detail?.profileImage || "";
+      setProfileImage(img);
+    };
+    window.addEventListener("profile-image-updated", onProfileImageUpdated);
+    return () => window.removeEventListener("profile-image-updated", onProfileImageUpdated);
+  }, []);
 
   // Notify parent when menu is toggled
   const handleMenuToggle = () => {
@@ -66,9 +107,17 @@ export default function Header({ onMenuToggle }) {
                 className="flex items-center gap-2 px-4 py-2 bg-blue-100 rounded hover:bg-blue-200 font-semibold text-blue-700"
               >
                 <span>{userName}</span>
-                <span className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">
-                  {userName.charAt(0).toUpperCase()}
-                </span>
+                {profileImage ? (
+                  <img
+                    src={`${BASE_URL}/profile_image/${profileImage}`}
+                    alt="Profile"
+                    className="w-8 h-8 rounded-full object-cover border-2 border-blue-600"
+                  />
+                ) : (
+                  <span className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">
+                    {userName.charAt(0).toUpperCase()}
+                  </span>
+                )}
               </Link>
             )}
           </div>
@@ -121,9 +170,17 @@ export default function Header({ onMenuToggle }) {
                 className="flex items-center gap-2 px-4 py-2 bg-blue-100 rounded hover:bg-blue-200 font-semibold text-blue-700"
               >
                 <span>{userName}</span>
-                <span className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">
-                  {userName.charAt(0).toUpperCase()}
-                </span>
+                {profileImage ? (
+                  <img
+                    src={`${BASE_URL}/profile_image/${profileImage}`}
+                    alt="Profile"
+                    className="w-8 h-8 rounded-full object-cover border-2 border-blue-600"
+                  />
+                ) : (
+                  <span className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-bold">
+                    {userName.charAt(0).toUpperCase()}
+                  </span>
+                )}
               </Link>
             )}
           </nav>

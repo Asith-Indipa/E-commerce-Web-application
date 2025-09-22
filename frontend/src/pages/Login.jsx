@@ -26,13 +26,40 @@ export default function Login() {
       const data = await res.json();
       if (data.success && data.token) {
         localStorage.setItem("token", data.token); // Store JWT securely
-        localStorage.setItem("userName", data.name); // Store user name
         localStorage.setItem("userEmail", email); // Store user email
-        setWelcome(`Welcome ${data.name}`); // Set welcome message
-        setTimeout(() => {
-          setWelcome("");
-          navigate("/");
-        }, 2000); // Show alert for 2 seconds then redirect
+
+        // Fetch current user to determine role and correct display name
+        try {
+          const meRes = await fetch(`${BASE_URL}/api/auth/me`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${data.token}` }
+          });
+          const me = await meRes.json();
+          const displayName = me?.user?.name || data.name || '';
+          const role = me?.user?.role || '';
+          if (displayName) localStorage.setItem("userName", displayName);
+
+          if (role === 'admin') {
+            // Admin: redirect immediately to admin dashboard
+            navigate('/admin/dashboard');
+            return;
+          } else {
+            // Non-admin: show welcome then go home
+            setWelcome(`Welcome ${displayName || 'User'}`);
+            setTimeout(() => {
+              setWelcome("");
+              navigate("/");
+            }, 2000);
+          }
+        } catch (e) {
+          // Fallback if /me fails: proceed as normal user
+          localStorage.setItem("userName", data.name || '');
+          setWelcome(`Welcome ${data.name || 'User'}`);
+          setTimeout(() => {
+            setWelcome("");
+            navigate("/");
+          }, 2000);
+        }
       } else {
         setError(data.error || "Invalid credentials");
       }

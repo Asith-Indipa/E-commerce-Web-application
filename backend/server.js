@@ -26,6 +26,9 @@ app.use(express.json());
 // Serve uploaded vehicle images
 app.use("/sellvehicle", express.static("sellvehicle"));
 
+// Serve profile images
+app.use("/profile_image", express.static("profile_image"));
+
 // Example route
 app.get("/", (req, res) => {
   res.send("Hello from Express backend 🚀");
