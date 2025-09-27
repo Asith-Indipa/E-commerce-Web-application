@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { BASE_URL } from "../util/api.js";
 
 export default function Profile() {
@@ -20,6 +20,21 @@ export default function Profile() {
   const [profileImage, setProfileImage] = useState("");
   const [profileImageFile, setProfileImageFile] = useState(null);
   const [imagePreview, setImagePreview] = useState("");
+  const [favLoading, setFavLoading] = useState(false);
+  const [favError, setFavError] = useState("");
+  const [favourites, setFavourites] = useState([]); // array of vehicle objects
+  const [myAds, setMyAds] = useState([]);
+  const [myAdsLoading, setMyAdsLoading] = useState(false);
+  const [myAdsError, setMyAdsError] = useState("");
+  const [editOpen, setEditOpen] = useState(false);
+  const [editAd, setEditAd] = useState(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editPrice, setEditPrice] = useState("");
+  const [editNegotiable, setEditNegotiable] = useState(false);
+  const [editDescription, setEditDescription] = useState("");
+  const [editDistrict, setEditDistrict] = useState("");
+  const [editSubLocation, setEditSubLocation] = useState("");
+  const [editMsg, setEditMsg] = useState("");
 
   useEffect(() => {
     fetch(`${BASE_URL}/api/location/all`)
@@ -33,6 +48,205 @@ export default function Profile() {
       })
       .catch(() => setLocations([]));
   }, []);
+
+  // Load favourites when Favorites tab is opened
+  useEffect(() => {
+    const loadFavourites = async () => {
+      setFavError("");
+      setFavLoading(true);
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setFavourites([]);
+          setFavLoading(false);
+          return;
+        }
+        // 1) Fetch favourite ids
+        const res = await fetch(`${BASE_URL}/api/favorite/my`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        const favs = Array.isArray(data?.favorites) ? data.favorites : [];
+        const ids = favs.map((f) => f.vehicle).filter(Boolean);
+        if (ids.length === 0) {
+          setFavourites([]);
+          setFavLoading(false);
+          return;
+        }
+        // 2) Fetch vehicle details in parallel (bounded)
+        const fetchOne = (id) =>
+          fetch(`${BASE_URL}/api/sellvehicle/details/${id}`).then((r) => r.json()).catch(() => null);
+        const chunks = [];
+        const concurrency = 4;
+        for (let i = 0; i < ids.length; i += concurrency) {
+          chunks.push(ids.slice(i, i + concurrency));
+        }
+        const results = [];
+        for (const group of chunks) {
+          const items = await Promise.all(group.map((vid) => fetchOne(vid)));
+          results.push(...items);
+        }
+        const vehicles = results.filter(Boolean);
+        setFavourites(vehicles);
+      } catch (e) {
+        setFavError("Failed to load favourites");
+        setFavourites([]);
+      } finally {
+        setFavLoading(false);
+      }
+    };
+    if (activeTab === "favorites") {
+      loadFavourites();
+    }
+  }, [activeTab]);
+
+  // Map category to selling route
+  const routeForCategory = (category) => {
+    switch (category) {
+      case 'Bicycles': return '/sell/bicycle';
+      case 'Boats':
+      case 'Water Transport':
+      case 'Boats & Water Transport': return '/sell/boats';
+      case 'Buses': return '/sell/busses';
+      case 'Cars': return '/sell/cars';
+      case 'Heavy Duty': return '/sell/heavyduty';
+      case 'Lorries':
+      case 'Lorries & Trucks': return '/sell/lorries';
+      case 'Motorbikes': return '/sell/motorbike';
+      case 'Three Wheelers': return '/sell/threewheel';
+      case 'Tractors': return '/sell/tractors';
+      case 'Vans': return '/sell/vans';
+      default: return '/sell';
+    }
+  };
+
+  const goToEditForm = (v) => {
+    const route = routeForCategory(v?.category);
+    navigate(route, { state: { editId: v?._id } });
+  };
+
+  const openEditAd = (v) => {
+    setEditAd(v);
+    setEditTitle(v?.title || "");
+    setEditPrice(typeof v?.price === 'number' ? String(v.price) : (v?.price || ""));
+    setEditNegotiable(!!v?.negotiable);
+    setEditDescription(v?.description || "");
+    setEditDistrict(v?.district || "");
+    setEditSubLocation(v?.subLocation || "");
+    setEditMsg("");
+    setEditOpen(true);
+  };
+
+  const closeEditAd = () => {
+    setEditOpen(false);
+    setEditAd(null);
+  };
+
+  const submitEditAd = async (e) => {
+    e?.preventDefault?.();
+    if (!editAd?._id) return;
+    try {
+      const token = localStorage.getItem('token');
+      const body = {
+        title: editTitle,
+        price: editPrice,
+        negotiable: editNegotiable,
+        description: editDescription,
+        district: editDistrict,
+        subLocation: editSubLocation,
+      };
+      const res = await fetch(`${BASE_URL}/api/sellvehicle/update/${editAd._id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify(body)
+      });
+      const j = await res.json();
+      if (j?.success && j.vehicle) {
+        setMyAds(prev => prev.map(v => v._id === j.vehicle._id ? j.vehicle : v));
+        setEditMsg('Saved successfully');
+        setTimeout(() => { closeEditAd(); }, 600);
+      } else {
+        setEditMsg(j?.error || 'Failed to save changes');
+      }
+    } catch (_) {
+      setEditMsg('Network error. Please try again.');
+    }
+  };
+
+  // Load my ads when My Ads tab is opened
+  useEffect(() => {
+    const loadMyAds = async () => {
+      setMyAdsError("");
+      setMyAdsLoading(true);
+      try {
+        const token = localStorage.getItem("token");
+        if (!token) {
+          setMyAds([]);
+          setMyAdsLoading(false);
+          return;
+        }
+        const res = await fetch(`${BASE_URL}/api/sellvehicle/my`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (data?.success && Array.isArray(data.vehicles)) {
+          setMyAds(data.vehicles);
+        } else if (Array.isArray(data)) {
+          // In case backend returns array directly
+          setMyAds(data);
+        } else {
+          setMyAds([]);
+        }
+      } catch (e) {
+        setMyAdsError("Failed to load your ads");
+        setMyAds([]);
+      } finally {
+        setMyAdsLoading(false);
+      }
+    };
+
+    if (activeTab === "ads") {
+      loadMyAds();
+    }
+  }, [activeTab]);
+
+  const removeFavourite = async (vehicleId) => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await fetch(`${BASE_URL}/api/favorite/${vehicleId}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const j = await res.json();
+      if (j?.success) {
+        setFavourites((prev) => prev.filter((v) => v?._id !== vehicleId));
+      } else {
+        alert(j?.error || "Failed to remove favourite");
+      }
+    } catch (_) {
+      alert("Network error. Please try again.");
+    }
+  };
+
+  // Move deleteMyAd to top-level so it's available to the JSX click handler
+  const deleteMyAd = async (vehicleId) => {
+    if (!window.confirm('Are you sure you want to delete this ad? This cannot be undone.')) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${BASE_URL}/api/sellvehicle/delete/${vehicleId}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const j = await res.json();
+      if (j?.success) {
+        setMyAds(prev => prev.filter(v => v._id !== vehicleId));
+      } else {
+        alert(j?.error || 'Failed to delete ad');
+      }
+    } catch (_) {
+      alert('Network error. Please try again.');
+    }
+  };
 
   useEffect(() => {
     const token = localStorage.getItem("token");
@@ -252,15 +466,96 @@ export default function Profile() {
         {activeTab === "ads" && (
           <div>
             <h2 className="text-xl font-bold mb-6">My Ads</h2>
-            <div className="text-gray-500">You have no ads yet.</div>
-            {/* Replace above with actual ads list if available */}
+            {myAdsLoading ? (
+              <div className="text-gray-500">Loading your ads…</div>
+            ) : myAdsError ? (
+              <div className="text-red-600">{myAdsError}</div>
+            ) : myAds.length === 0 ? (
+              <div className="text-gray-500">You have no ads yet.</div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {myAds.map((v) => (
+                  <div key={v._id} className="bg-white border rounded-lg shadow hover:shadow-md transition p-3 flex flex-col">
+                    <Link to={`/vehicle/${v._id}`} className="block">
+                      <div className="w-full h-40 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center mb-2">
+                        {Array.isArray(v.photos) && v.photos[0] ? (
+                          <img
+                            src={`${BASE_URL}/sellvehicle/${v.photos[0]}`}
+                            alt={v.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => (e.currentTarget.src = "/no-image.png")}
+                          />
+                        ) : (
+                          <span className="text-gray-400 text-sm">No Image</span>
+                        )}
+                      </div>
+                      <div className="font-semibold text-blue-900 truncate">{v.title}</div>
+                    </Link>
+                    <div className="flex items-center justify-between mt-2 text-sm text-gray-600">
+                      <div className="font-bold text-green-600">{v.price ? `Rs ${v.price.toLocaleString()}` : ''}</div>
+                      <div>{v.district}{v.subLocation ? `, ${v.subLocation}` : ''}</div>
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <Link to={`/vehicle/${v._id}`} className="px-3 py-2 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">
+                        View
+                      </Link>
+                      <button onClick={() => goToEditForm(v)} className="px-3 py-2 rounded bg-amber-500 text-white text-sm font-semibold hover:bg-amber-600">
+                        Edit
+                      </button>
+                      <button onClick={() => deleteMyAd(v._id)} className="px-3 py-2 rounded bg-red-600 text-white text-sm font-semibold hover:bg-red-700">
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {activeTab === "favorites" && (
           <div>
             <h2 className="text-xl font-bold mb-6">Favorites</h2>
-            <div className="text-gray-500">You have no favorites yet.</div>
-            {/* Replace above with actual favorites list if available */}
+            {favLoading ? (
+              <div className="text-gray-500">Loading favourites…</div>
+            ) : favError ? (
+              <div className="text-red-600">{favError}</div>
+            ) : favourites.length === 0 ? (
+              <div className="text-gray-500">You have no favourites yet.</div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {favourites.map((v) => (
+                  <div key={v._id} className="bg-white border rounded-lg shadow hover:shadow-md transition p-3 flex flex-col">
+                    <Link to={`/vehicle/${v._id}`} className="block">
+                      <div className="w-full h-40 rounded-md overflow-hidden bg-gray-100 flex items-center justify-center mb-2">
+                        {Array.isArray(v.photos) && v.photos[0] ? (
+                          <img
+                            src={`${BASE_URL}/sellvehicle/${v.photos[0]}`}
+                            alt={v.title}
+                            className="w-full h-full object-cover"
+                            onError={(e) => (e.currentTarget.src = "/no-image.png")}
+                          />
+                        ) : (
+                          <span className="text-gray-400 text-sm">No Image</span>
+                        )}
+                      </div>
+                      <div className="font-semibold text-blue-900 truncate">{v.title}</div>
+                    </Link>
+                    <div className="flex items-center justify-between mt-2 text-sm text-gray-600">
+                      <div className="font-bold text-green-600">{v.price ? `Rs ${v.price.toLocaleString()}` : ''}</div>
+                      <div>{v.district}{v.subLocation ? `, ${v.subLocation}` : ''}</div>
+                    </div>
+                    <div className="mt-3 flex gap-2">
+                      <Link to={`/vehicle/${v._id}`} className="px-3 py-2 rounded bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700">
+                        View
+                      </Link>
+                      <button onClick={() => removeFavourite(v._id)} className="px-3 py-2 rounded bg-red-600 text-white text-sm font-semibold hover:bg-red-700">
+                        Remove
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
         {activeTab === "settings" && (
@@ -461,6 +756,56 @@ export default function Profile() {
               </div>
             )}
           </>
+        )}
+        {/* Edit Ad Modal */}
+        {editOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center">
+            <div className="absolute inset-0 bg-black/40" onClick={closeEditAd} />
+            <div className="relative bg-white rounded-xl shadow-xl w-full max-w-2xl mx-4 p-6">
+              <h3 className="text-xl font-bold mb-4">Edit Ad</h3>
+              <form onSubmit={submitEditAd} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Title</label>
+                  <input value={editTitle} onChange={e=>setEditTitle(e.target.value)} className="border rounded px-3 py-2 w-full" required />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Price</label>
+                  <input value={editPrice} onChange={e=>setEditPrice(e.target.value.replace(/[^0-9]/g, ''))} className="border rounded px-3 py-2 w-full" />
+                </div>
+                <div className="flex items-center gap-2 mt-6">
+                  <input id="negChk" type="checkbox" checked={editNegotiable} onChange={e=>setEditNegotiable(e.target.checked)} />
+                  <label htmlFor="negChk" className="text-sm">Negotiable</label>
+                </div>
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium mb-1">Description</label>
+                  <textarea value={editDescription} onChange={e=>setEditDescription(e.target.value)} rows={4} className="border rounded px-3 py-2 w-full" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">District</label>
+                  <select value={editDistrict} onChange={e=>{ setEditDistrict(e.target.value); setEditSubLocation(''); }} className="border rounded px-3 py-2 w-full">
+                    <option value="">Select District</option>
+                    {locations.map(loc => (
+                      <option key={loc.district} value={loc.district}>{loc.district}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Area</label>
+                  <select value={editSubLocation} onChange={e=>setEditSubLocation(e.target.value)} className="border rounded px-3 py-2 w-full" disabled={!editDistrict}>
+                    <option value="">Select Area</option>
+                    {locations.find(l=>l.district===editDistrict)?.sublocations.map(sub => (
+                      <option key={sub} value={sub}>{sub}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="md:col-span-2 flex items-center gap-3 mt-2">
+                  <button type="submit" className="px-4 py-2 rounded bg-blue-600 text-white font-semibold hover:bg-blue-700">Save</button>
+                  <button type="button" onClick={closeEditAd} className="px-4 py-2 rounded border font-semibold hover:bg-gray-50">Cancel</button>
+                  {editMsg && <span className={`text-sm ${editMsg.includes('success') ? 'text-green-600' : 'text-red-600'}`}>{editMsg}</span>}
+                </div>
+              </form>
+            </div>
+          </div>
         )}
       </main>
     </div>

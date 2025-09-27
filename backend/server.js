@@ -17,6 +17,7 @@ const vehicleModelBrandRoutes = require("./routes/vehiclemodelbrand");
 const locationRoutes = require("./routes/location");
 const { router: authRoutes } = require("./routes/auth");
 const sellVehicleRoutes = require("./routes/sellvehicle");
+const favoriteRoutes = require("./routes/favorite");
 const cors = require("cors");
 
 // Middleware
@@ -39,6 +40,7 @@ app.use("/api/vehiclemodelbrand", vehicleModelBrandRoutes);
 app.use("/api/location", locationRoutes);
 app.use("/api/sellvehicle", sellVehicleRoutes);
 app.use("/api/auth", authRoutes);
+app.use("/api/favorite", favoriteRoutes);
 
 // Start server
 app.listen(PORT, () => {

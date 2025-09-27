@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom"; // Add this import
+import { useNavigate, useLocation } from "react-router-dom"; // Add this import
 import { BASE_URL } from "../util/api.js"; // Add this import
 import { fetchUserLocation } from "../util/userLocation.js"; // Add this import
 import Select from "react-select"; // Add this import
@@ -13,6 +13,8 @@ function formatNumberWithCommas(num) {
 }
 
 export default function SellBicycle() {
+  const locationHook = useLocation();
+  const editId = locationHook?.state?.editId || null;
   const [location, setLocation] = useState("Kamburupitiya");
   const [category, setCategory] = useState("Bicycles");
   const [brand, setBrand] = useState("");
@@ -22,6 +24,8 @@ export default function SellBicycle() {
   const [price, setPrice] = useState("");
   const [negotiable, setNegotiable] = useState(false);
   const [photos, setPhotos] = useState([null, null, null, null, null]);
+  const [existingPhotos, setExistingPhotos] = useState([]); // filenames from server
+  const [removeSet, setRemoveSet] = useState(new Set()); // names to remove on save
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categories, setCategories] = useState([]);
   const [brands, setBrands] = useState([]);
@@ -84,9 +88,36 @@ export default function SellBicycle() {
     };
     fetchLocations();
 
-    // Fetch user's location and set as default
-    fetchUserLocation(setLocation, setDistrict, setSubLocation);
+    // Fetch user's location and set as default (skip if editing)
+    if (!editId) {
+      fetchUserLocation(setLocation, setDistrict, setSubLocation);
+    }
   }, []);
+
+  // If in edit mode, fetch existing vehicle and prefill
+  useEffect(() => {
+    const run = async () => {
+      if (!editId) return;
+      try {
+        const res = await fetch(`${BASE_URL}/api/sellvehicle/details/${editId}`);
+        const v = await res.json();
+        if (!v || v.error) return;
+        setCategory(v.category || "Bicycles");
+        setBrand(v.brand || "");
+        setCondition(v.condition || "Used");
+        setTitle(v.title || "");
+        setDescription(v.description || "");
+        setPrice(String(v.price || ""));
+        setNegotiable(!!v.negotiable);
+        const locStr = v.subLocation ? `${v.district}, ${v.subLocation}` : (v.district || "");
+        setLocation(locStr || "");
+        setDistrict(v.district || "");
+        setSubLocation(v.subLocation || "");
+        setExistingPhotos(Array.isArray(v.photos) ? v.photos : []);
+      } catch (_) {}
+    };
+    run();
+  }, [editId]);
 
   const handlePhotoChange = (idx, file) => {
     const newPhotos = [...photos];
@@ -94,58 +125,113 @@ export default function SellBicycle() {
     setPhotos(newPhotos);
   };
 
+  const toggleRemoveExisting = (filename) => {
+    setRemoveSet(prev => {
+      const next = new Set(prev);
+      if (next.has(filename)) next.delete(filename); else next.add(filename);
+      return next;
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setShowValidation(true);
     setSuccess(""); // Reset success message
     const priceValid = price && !isNaN(price) && Number(price) > 0;
-    if (!brand || !title || !description || !priceValid || !photos.some((p) => p)) {
+    // In edit mode, photos are not required
+    if (!brand || !title || !description || !priceValid || (!editId && !photos.some((p) => p))) {
       return;
     }
-    const formData = new FormData();
-    formData.append("brand", brand);
-    formData.append("title", title);
-    formData.append("description", description);
-    formData.append("price", price);
-    formData.append("negotiable", negotiable);
-    formData.append("condition", condition);
-    formData.append("location", location);
-    formData.append("category", category);
-    formData.append("district", district);
-    formData.append("subLocation", subLocation);
-    photos.forEach((photo) => {
-      if (photo) formData.append("photos", photo);
-    });
     const token = localStorage.getItem("token"); // Get JWT token
 
     try {
-      const res = await fetch(`${BASE_URL}/api/sellvehicle/add`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}` // Add JWT token
-        },
-        body: formData
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSuccess("✅ Post your Ad successfully!");
-        setShowValidation(false);
-        setBrand("");
-        setTitle("");
-        setDescription("");
-        setPrice("");
-        setNegotiable(false);
-        setPhotos([null, null, null, null, null]);
-        setError("");
-        setDistrict("");
-        setSubLocation("");
-        setCondition("Used");
-        setTimeout(() => {
-          setSuccess("");
-          navigate("/");
-        }, 2000); // Show alert for 2 seconds, then redirect
+      if (editId) {
+        // Update all fields
+        const body = {
+          brand,
+          title,
+          description,
+          price,
+          negotiable,
+          condition,
+          category,
+          district,
+          subLocation,
+        };
+        const res = await fetch(`${BASE_URL}/api/sellvehicle/update/${editId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+          const hasNewFiles = photos.some(p => !!p);
+          const hasRemovals = removeSet.size > 0;
+          if (hasNewFiles || hasRemovals) {
+            const fd = new FormData();
+            if (hasRemovals) fd.append('remove', JSON.stringify(Array.from(removeSet)));
+            photos.forEach((file) => { if (file) fd.append('photos', file); });
+            try {
+              await fetch(`${BASE_URL}/api/sellvehicle/photos/${editId}`, {
+                method: 'PUT',
+                headers: { Authorization: `Bearer ${token}` },
+                body: fd
+              });
+            } catch (_) {}
+          }
+          setSuccess("✅ Updated your ad successfully!");
+          setShowValidation(false);
+          setTimeout(() => {
+            setSuccess("");
+            navigate("/profile", { state: { tab: 'ads' } });
+          }, 1200);
+        } else {
+          setError(data.error || "Failed to update vehicle details");
+        }
       } else {
-        setError(data.error || "Failed to save vehicle details");
+        // Create mode
+        const formData = new FormData();
+        formData.append("brand", brand);
+        formData.append("title", title);
+        formData.append("description", description);
+        formData.append("price", price);
+        formData.append("negotiable", negotiable);
+        formData.append("condition", condition);
+        formData.append("location", location);
+        formData.append("category", category);
+        formData.append("district", district);
+        formData.append("subLocation", subLocation);
+        photos.forEach((photo) => {
+          if (photo) formData.append("photos", photo);
+        });
+        const res = await fetch(`${BASE_URL}/api/sellvehicle/add`, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${token}` // Add JWT token
+          },
+          body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+          setSuccess("✅ Post your Ad successfully!");
+          setShowValidation(false);
+          setBrand("");
+          setTitle("");
+          setDescription("");
+          setPrice("");
+          setNegotiable(false);
+          setPhotos([null, null, null, null, null]);
+          setError("");
+          setDistrict("");
+          setSubLocation("");
+          setCondition("Used");
+          setTimeout(() => {
+            setSuccess("");
+            navigate("/");
+          }, 2000); // Show alert for 2 seconds, then redirect
+        } else {
+          setError(data.error || "Failed to save vehicle details");
+        }
       }
     } catch (err) {
       setError("Network error");
@@ -161,7 +247,7 @@ export default function SellBicycle() {
           <span role="alert">{success}</span>
         </div>
       )}
-      <h1 className="text-xl sm:text-2xl font-bold mb-4">Fill in the details</h1>
+      <h1 className="text-xl sm:text-2xl font-bold mb-4">{editId ? 'Edit your ad' : 'Fill in the details'}</h1>
       <div className="flex flex-col sm:flex-row gap-2 mb-4 items-center">
         <div className="flex items-center gap-2">
           <span className="text-green-700 font-semibold">{location}</span>
@@ -391,7 +477,25 @@ export default function SellBicycle() {
           Negotiable
         </label>
         <div>
-          <div className="font-medium mb-2">Add up to 5 photos <span className="text-xs text-gray-500">(You must upload at least one photo)</span></div>
+          <div className="font-medium mb-2">Add up to 5 photos <span className="text-xs text-gray-500">{editId ? '(Existing photos shown below. You can remove or upload new ones.)' : '(You must upload at least one photo)'}</span></div>
+          {editId && existingPhotos.length > 0 && (
+            <div className="mb-3">
+              <div className="text-sm text-gray-600 mb-1">Existing photos (click to mark for removal):</div>
+              <div className="flex gap-2 flex-wrap">
+                {existingPhotos.map((fname) => (
+                  <button
+                    type="button"
+                    key={fname}
+                    onClick={() => toggleRemoveExisting(fname)}
+                    className={`relative border rounded w-20 h-20 overflow-hidden ${removeSet.has(fname) ? 'ring-2 ring-red-500 opacity-60' : ''}`}
+                    title={removeSet.has(fname) ? 'Marked for removal' : 'Click to remove'}
+                  >
+                    <img src={`${BASE_URL}/sellvehicle/${fname}`} alt="existing" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex gap-2 flex-wrap">
             {photos.map((photo, idx) => (
               <label
@@ -422,8 +526,8 @@ export default function SellBicycle() {
               </label>
             ))}
           </div>
-          {/* Only show error if no photo is present */}
-          {showValidation && !photos.some((p) => p) && (
+          {/* Only show error if no photo is present in create mode */}
+          {showValidation && !editId && !photos.some((p) => p) && (
             <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
           )}
         </div>

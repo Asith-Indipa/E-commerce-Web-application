@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { BASE_URL } from "../util/api.js";
-import { ChevronLeft, ChevronRight, ArrowLeftCircle } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowLeftCircle, Heart } from "lucide-react";
 
 export default function VehicleDetails() {
   const { id } = useParams();
@@ -12,6 +12,7 @@ export default function VehicleDetails() {
   const similarAdsRef = useRef(null);
   const [imageModal, setImageModal] = useState({ open: false, src: "" });
   const [zoomed, setZoomed] = useState(false);
+  const [isFav, setIsFav] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -21,6 +22,20 @@ export default function VehicleDetails() {
       .then(data => {
         setVehicle(data);
         setLoading(false);
+        // Check favourite status from backend if logged in
+        try {
+          const token = localStorage.getItem('token');
+          if (token && data?._id) {
+            fetch(`${BASE_URL}/api/favorite/is/${data._id}`, {
+              headers: { 'Authorization': `Bearer ${token}` }
+            })
+              .then(r => r.json())
+              .then(j => setIsFav(!!j?.isFav))
+              .catch(() => setIsFav(false));
+          } else {
+            setIsFav(false);
+          }
+        } catch (_) { setIsFav(false); }
         // Fetch similar vehicles after main vehicle loads
         if (data && data.category) {
           fetch(`${BASE_URL}/api/sellvehicle/all`)
@@ -39,6 +54,28 @@ export default function VehicleDetails() {
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "smooth" });
   }, [location.pathname]);
+
+  const toggleFavourite = async () => {
+    if (!vehicle?._id) return;
+    const token = localStorage.getItem('token');
+    if (!token) {
+      navigate('/login');
+      return;
+    }
+    try {
+      const url = `${BASE_URL}/api/favorite/${vehicle._id}`;
+      const method = isFav ? 'DELETE' : 'POST';
+      const res = await fetch(url, { method, headers: { 'Authorization': `Bearer ${token}` } });
+      const j = await res.json();
+      if (j?.success) {
+        setIsFav(prev => !prev);
+      } else {
+        alert(j?.error || 'Failed to update favourites');
+      }
+    } catch (_) {
+      alert('Network error. Please try again.');
+    }
+  };
 
   // Helper to format field names
   function formatLabel(key) {
@@ -182,13 +219,22 @@ export default function VehicleDetails() {
           </div>
         </div>
         {/* Price */}
-        <div className="flex items-center gap-3 mb-6">
-          <div className="text-3xl font-extrabold text-green-600 bg-green-50 px-4 py-2 rounded-xl shadow">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-6 w-full">
+          <div className="text-3xl font-extrabold text-green-600 bg-green-50 px-4 py-2 rounded-xl shadow w-full sm:w-auto text-center sm:text-left">
             Rs {vehicle.price ? vehicle.price.toLocaleString() : ""}
           </div>
           {vehicle.negotiable && (
             <span className="bg-yellow-400 text-white text-sm px-3 py-1 rounded-full font-bold shadow">Negotiable</span>
           )}
+          <button
+            type="button"
+            onClick={toggleFavourite}
+            className={`sm:ml-auto ml-0 inline-flex items-center justify-center gap-2 px-4 py-3 rounded-full font-semibold shadow transition-colors w-full sm:w-auto ${isFav ? 'bg-pink-600 text-white hover:bg-pink-700' : 'bg-pink-50 text-pink-700 hover:bg-pink-100'}`}
+            title={isFav ? 'Remove from favourites' : 'Add to favourites'}
+          >
+            <Heart size={20} className={isFav ? 'fill-current' : ''} />
+            {isFav ? 'Favourited' : 'Add to favourites'}
+          </button>
         </div>
         {/* Vehicle Info - dynamic */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6 text-base">

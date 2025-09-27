@@ -7,6 +7,7 @@ const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const path = require("path");
 const fs = require("fs");
+const Favorite = require("../models/Favorite");
 
 // Multer config for profile images
 const storage = multer.diskStorage({
@@ -174,10 +175,69 @@ router.put("/me/password", authMiddleware, async (req, res) => {
 // Delete current user account
 router.delete("/me", authMiddleware, async (req, res) => {
   try {
-    await User.findByIdAndDelete(req.userId);
-    res.json({ success: true });
-  } catch {
-    res.json({ success: false, error: "Failed to delete account" });
+    const user = await User.findById(req.userId);
+    if (!user) return res.json({ success: false, error: "User not found" });
+
+    // Disallow deleting admin accounts from the profile endpoint
+    if (user.role === 'admin') {
+      return res.status(403).json({ success: false, error: "Admin accounts cannot be deleted from profile" });
+    }
+
+    // 1) Remove user's vehicle images and records
+    try {
+      const objectId = new mongoose.Types.ObjectId(req.userId);
+      const vehicles = await mongoose.connection
+        .collection('sellvehicledetails')
+        .find({ user: objectId })
+        .toArray();
+
+      for (const v of vehicles) {
+        const photos = Array.isArray(v.photos) ? v.photos : [];
+        for (const filename of photos) {
+          try {
+            const filePath = path.join(__dirname, "../sellvehicle", filename);
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+          } catch (_) {}
+        }
+      }
+
+      await mongoose.connection
+        .collection('sellvehicledetails')
+        .deleteMany({ user: objectId });
+
+      // Remove any favourites that referenced the deleted vehicles (for all users)
+      try {
+        const vehicleIds = vehicles.map(v => v._id).filter(Boolean);
+        if (vehicleIds.length > 0) {
+          await Favorite.deleteMany({ vehicle: { $in: vehicleIds } });
+        }
+      } catch (_) {}
+    } catch (_) {
+      // ignore cleanup failure
+    }
+
+    // 2) Remove user's own favourites
+    try {
+      await Favorite.deleteMany({ user: req.userId });
+    } catch (_) {}
+
+    // 3) Remove user's profile image file if present
+    if (user.profileImage) {
+      try {
+        const imgPath = path.join(__dirname, "../profile_image", user.profileImage);
+        if (fs.existsSync(imgPath)) fs.unlinkSync(imgPath);
+      } catch (_) {}
+    }
+
+    // 4) Soft delete account
+    user.isActive = false;
+    user.deletedAt = new Date();
+    user.profileImage = null;
+    await user.save();
+
+    return res.json({ success: true });
+  } catch (e) {
+    return res.json({ success: false, error: "Failed to delete account" });
   }
 });
 
@@ -259,11 +319,24 @@ router.delete('/admin/user/:id', authMiddleware, isAdmin, async (req, res) => {
       await mongoose.connection
         .collection('sellvehicledetails')
         .deleteMany({ user: objectId });
+
+      // Remove any favourites that referenced the deleted vehicles (for all users)
+      try {
+        const vehicleIds = vehicles.map(v => v._id).filter(Boolean);
+        if (vehicleIds.length > 0) {
+          await Favorite.deleteMany({ vehicle: { $in: vehicleIds } });
+        }
+      } catch (_) {}
     } catch (_) {
       // Ignore errors from vehicle cleanup to not block user deletion
     }
 
-    // 3) Attempt to remove user's profile image file if present
+    // 3) Remove user's own favourites
+    try {
+      await Favorite.deleteMany({ user: id });
+    } catch (_) {}
+
+    // 4) Attempt to remove user's profile image file if present
     if (user.profileImage) {
       try {
         const imgPath = path.join(__dirname, "../profile_image", user.profileImage);
@@ -271,7 +344,7 @@ router.delete('/admin/user/:id', authMiddleware, isAdmin, async (req, res) => {
       } catch (_) {}
     }
 
-    // 4) Soft delete the user (do not remove the document)
+    // 5) Soft delete the user (do not remove the document)
     user.isActive = false;
     user.deletedAt = new Date();
     // Optionally clear profileImage reference after file removal

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { BASE_URL } from "../util/api.js"; // <-- If util is in project root util/api.jsrc/util/api.js
 import { fetchUserLocation } from "../util/userLocation.js"; // Add this import
 import Select from "react-select"; // Add this import
@@ -24,6 +24,8 @@ function formatNumberWithCommas(num) {
 }
 
 export default function SellCars() {
+  const locationHook = useLocation();
+  const editId = locationHook?.state?.editId || null;
   const [location, setLocation] = useState("Kamburupitiya");
   const [category, setCategory] = useState("Cars");
   const [condition, setCondition] = useState("");
@@ -42,6 +44,8 @@ export default function SellCars() {
   const [price, setPrice] = useState("");
   const [negotiable, setNegotiable] = useState(false);
   const [photos, setPhotos] = useState([null, null, null, null, null]);
+  const [existingPhotos, setExistingPhotos] = useState([]);
+  const [removeSet, setRemoveSet] = useState(new Set());
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categories, setCategories] = useState([]);
   const [showValidation, setShowValidation] = useState(false);
@@ -101,8 +105,10 @@ export default function SellCars() {
     };
     fetchLocations();
 
-    // Fetch user's location and set as default
-    fetchUserLocation(setLocation, setDistrict, setSubLocation);
+    // Fetch user's location and set as default (skip when editing)
+    if (!editId) {
+      fetchUserLocation(setLocation, setDistrict, setSubLocation);
+    }
   }, []);
 
   // Fetch models for selected brand
@@ -137,6 +143,46 @@ export default function SellCars() {
     setPhotos(newPhotos);
   };
 
+  const toggleRemoveExisting = (filename) => {
+    setRemoveSet(prev => {
+      const next = new Set(prev);
+      if (next.has(filename)) next.delete(filename); else next.add(filename);
+      return next;
+    });
+  };
+
+  // If in edit mode, fetch existing vehicle and prefill
+  useEffect(() => {
+    const run = async () => {
+      if (!editId) return;
+      try {
+        const res = await fetch(`${BASE_URL}/api/sellvehicle/details/${editId}`);
+        const v = await res.json();
+        if (!v || v.error) return;
+        setCategory(v.category || "Cars");
+        setCondition(v.condition || "");
+        setBrand(v.brand || "");
+        setModel(v.model || "");
+        setTrim(v.trim || "");
+        setYear((v.year || "").toString().replace(/[^0-9]/g, ""));
+        setMileage((v.mileage || "").toString().replace(/[^0-9]/g, ""));
+        setEngine((v.engine || "").toString().replace(/[^0-9]/g, ""));
+        setFuel(v.fuel || "");
+        setTransmission(v.transmission || "");
+        setBodyType(v.bodyType || "");
+        setDescription(v.description || "");
+        setPrice(String(v.price || ""));
+        setNegotiable(!!v.negotiable);
+        const locStr = v.subLocation ? `${v.district}, ${v.subLocation}` : (v.district || "");
+        setLocation(locStr || "");
+        setDistrict(v.district || "");
+        setSubLocation(v.subLocation || "");
+        setExistingPhotos(Array.isArray(v.photos) ? v.photos : []);
+      } catch (_) {}
+    };
+    run();
+  }, [editId]);
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setShowValidation(true);
@@ -157,67 +203,117 @@ export default function SellCars() {
       !transmission ||
       !description ||
       !priceValid ||
-      !photos.some((p) => p)
+      (!editId && !photos.some((p) => p))
     ) {
       return;
     }
-    const formData = new FormData();
-    formData.append("title", title); // Add title to formData
-    formData.append("brand", brand);
-    formData.append("model", model);
-    formData.append("trim", trim);
-    formData.append("condition", condition);
-    formData.append("year", year);
-    formData.append("mileage", mileage + "km");
-    formData.append("engine", engine + "cc");
-    formData.append("fuel", fuel);
-    formData.append("transmission", transmission);
-    formData.append("bodyType", bodyType);
-    formData.append("description", description);
-    formData.append("price", price);
-    formData.append("negotiable", negotiable);
-    formData.append("category", category);
-    formData.append("district", district || location.split(",")[0]);
-    formData.append("subLocation", subLocation || (location.split(",")[1] ? location.split(",")[1].trim() : ""));
-    photos.forEach((photo) => {
-      if (photo) formData.append("photos", photo);
-    });
     const token = localStorage.getItem("token"); // Get JWT token
 
     try {
-      const res = await fetch(`${BASE_URL}/api/sellvehicle/add`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}` // Add JWT token
-        },
-        body: formData
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSuccess("✅ Post your Ad successfully!");
-        setShowValidation(false);
-        setBrand("");
-        setModel("");
-        setTrim("");
-        setCondition("");
-        setYear("");
-        setMileage("");
-        setEngine("");
-        setFuel("");
-        setTransmission("");
-        setBodyType("");
-        setDescription("");
-        setPrice("");
-        setNegotiable(false);
-        setPhotos([null, null, null, null, null]);
-        setDistrict("");
-        setSubLocation("");
-        setTimeout(() => {
-          setSuccess("");
-          navigate("/");
-        }, 2000); // Show alert for 2 seconds, then redirect
+      if (editId) {
+        // Update all fields
+        const body = {
+          title,
+          brand,
+          model,
+          trim,
+          condition,
+          year,
+          mileage,
+          engine,
+          fuel,
+          transmission,
+          bodyType,
+          description,
+          price,
+          negotiable,
+          category,
+          district: district || location.split(",")[0],
+          subLocation: subLocation || (location.split(",")[1] ? location.split(",")[1].trim() : ""),
+        };
+        const res = await fetch(`${BASE_URL}/api/sellvehicle/update/${editId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+          const hasNewFiles = photos.some(p => !!p);
+          const hasRemovals = removeSet.size > 0;
+          if (hasNewFiles || hasRemovals) {
+            const fd = new FormData();
+            if (hasRemovals) fd.append('remove', JSON.stringify(Array.from(removeSet)));
+            photos.forEach((file) => { if (file) fd.append('photos', file); });
+            try {
+              await fetch(`${BASE_URL}/api/sellvehicle/photos/${editId}`, {
+                method: 'PUT',
+                headers: { Authorization: `Bearer ${token}` },
+                body: fd
+              });
+            } catch (_) {}
+          }
+          setSuccess("✅ Updated your ad successfully!");
+          setShowValidation(false);
+          setTimeout(() => {
+            setSuccess("");
+            navigate("/profile", { state: { tab: 'ads' } });
+          }, 1200);
+        } else {
+          setError(data.error || "Failed to update vehicle details");
+        }
       } else {
-        setError(data.error || "Failed to save vehicle details");
+        // Create mode
+        const formData = new FormData();
+        formData.append("title", title);
+        formData.append("brand", brand);
+        formData.append("model", model);
+        formData.append("trim", trim);
+        formData.append("condition", condition);
+        formData.append("year", year);
+        formData.append("mileage", mileage + "km");
+        formData.append("engine", engine + "cc");
+        formData.append("fuel", fuel);
+        formData.append("transmission", transmission);
+        formData.append("bodyType", bodyType);
+        formData.append("description", description);
+        formData.append("price", price);
+        formData.append("negotiable", negotiable);
+        formData.append("category", category);
+        formData.append("district", district || location.split(",")[0]);
+        formData.append("subLocation", subLocation || (location.split(",")[1] ? location.split(",")[1].trim() : ""));
+        photos.forEach((photo) => { if (photo) formData.append("photos", photo); });
+        const res = await fetch(`${BASE_URL}/api/sellvehicle/add`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${token}` },
+          body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+          setSuccess("✅ Post your Ad successfully!");
+          setShowValidation(false);
+          setBrand("");
+          setModel("");
+          setTrim("");
+          setCondition("");
+          setYear("");
+          setMileage("");
+          setEngine("");
+          setFuel("");
+          setTransmission("");
+          setBodyType("");
+          setDescription("");
+          setPrice("");
+          setNegotiable(false);
+          setPhotos([null, null, null, null, null]);
+          setDistrict("");
+          setSubLocation("");
+          setTimeout(() => {
+            setSuccess("");
+            navigate("/");
+          }, 2000);
+        } else {
+          setError(data.error || "Failed to save vehicle details");
+        }
       }
     } catch (err) {
       setError("Network error");
@@ -233,7 +329,7 @@ export default function SellCars() {
           <span role="alert">{success}</span>
         </div>
       )}
-      <h1 className="text-xl sm:text-2xl font-bold mb-4">Fill in the details</h1>
+      <h1 className="text-xl sm:text-2xl font-bold mb-4">{editId ? 'Edit your ad' : 'Fill in the details'}</h1>
       <div className="flex flex-col sm:flex-row gap-2 mb-4 items-center">
         <div className="flex items-center gap-2">
           <span className="text-green-700 font-semibold">{location}</span>
@@ -564,7 +660,25 @@ export default function SellCars() {
         </label>
         <hr className="my-6" />
         <div>
-          <div className="font-medium mb-2">Add up to 5 photos <span className="text-xs text-gray-500 ml-1">(You must upload at least one photo)</span></div>
+          <div className="font-medium mb-2">Add up to 5 photos <span className="text-xs text-gray-500 ml-1">{editId ? '(Existing photos shown below. You can remove or upload new ones.)' : '(You must upload at least one photo)'}</span></div>
+          {editId && existingPhotos.length > 0 && (
+            <div className="mb-3">
+              <div className="text-sm text-gray-600 mb-1">Existing photos (click to mark for removal):</div>
+              <div className="flex gap-2 flex-wrap">
+                {existingPhotos.map((fname) => (
+                  <button
+                    type="button"
+                    key={fname}
+                    onClick={() => toggleRemoveExisting(fname)}
+                    className={`relative border rounded w-20 h-20 overflow-hidden ${removeSet.has(fname) ? 'ring-2 ring-red-500 opacity-60' : ''}`}
+                    title={removeSet.has(fname) ? 'Marked for removal' : 'Click to remove'}
+                  >
+                    <img src={`${BASE_URL}/sellvehicle/${fname}`} alt="existing" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex gap-2 flex-wrap mb-1">
             {photos.map((photo, idx) => (
               <label
@@ -595,7 +709,7 @@ export default function SellCars() {
               </label>
             ))}
           </div>
-          {showValidation && !photos.some((p) => p) && (
+          {showValidation && !editId && !photos.some((p) => p) && (
             <div className="text-xs text-red-500 mt-1">You must fill out this field.</div>
           )}
         </div>

@@ -20,6 +20,13 @@ export default function UserTab() {
   const [formMsg, setFormMsg] = useState("");
   const [locations, setLocations] = useState([]);
 
+  // Filters
+  const [qName, setQName] = useState("");
+  const [qId, setQId] = useState("");
+  const [qEmail, setQEmail] = useState("");
+  const [qPhone, setQPhone] = useState("");
+  const [qLocation, setQLocation] = useState("");
+
   useEffect(() => {
     const fetchUsers = async () => {
       try {
@@ -153,6 +160,29 @@ export default function UserTab() {
     });
   };
 
+  // Derived filtered users (client-side)
+  const filteredUsers = React.useMemo(() => {
+    const name = qName.trim().toLowerCase();
+    const id = qId.trim().toLowerCase();
+    const email = qEmail.trim().toLowerCase();
+    const phone = qPhone.replace(/\D/g, '');
+    const loc = qLocation.trim().toLowerCase();
+    if (!name && !id && !email && !phone && !loc) return users;
+    return users.filter(u => {
+      const uName = (u?.name || '').toLowerCase();
+      const uId = (u?._id || '').toLowerCase();
+      const uEmail = (u?.email || '').toLowerCase();
+      const uPhone = String(u?.phone || '').replace(/\D/g, '');
+      const uLoc = `${u?.location || ''} ${u?.subLocation || ''}`.toLowerCase();
+      const okName = name ? uName.includes(name) : true;
+      const okId = id ? (uId.includes(id) || uId.slice(-8).includes(id)) : true;
+      const okEmail = email ? uEmail.includes(email) : true;
+      const okPhone = phone ? uPhone.includes(phone) : true;
+      const okLoc = loc ? uLoc.includes(loc) : true;
+      return okName && okId && okEmail && okPhone && okLoc;
+    });
+  }, [users, qName, qId, qEmail, qPhone, qLocation]);
+
   const handleCreateUser = async (e) => {
     e.preventDefault();
     setFormMsg("");
@@ -269,6 +299,37 @@ export default function UserTab() {
         </form>
       </div>
 
+      {/* Filters */}
+      <div className="bg-white rounded-lg shadow p-4 mb-6">
+        <h3 className="text-lg font-semibold mb-4">Filter Users</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <div>
+            <label className="block text-sm font-medium mb-1">By Name</label>
+            <input value={qName} onChange={e=>setQName(e.target.value)} placeholder="Search name…" className="border rounded px-3 py-2 w-full" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">By User ID</label>
+            <input value={qId} onChange={e=>setQId(e.target.value)} placeholder="Full or last 8 chars" className="border rounded px-3 py-2 w-full" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">By Email</label>
+            <input value={qEmail} onChange={e=>setQEmail(e.target.value)} placeholder="Search email…" className="border rounded px-3 py-2 w-full" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">By Phone</label>
+            <input value={qPhone} onChange={e=>setQPhone(e.target.value.replace(/[^0-9]/g, ''))} placeholder="e.g. 0771234567" className="border rounded px-3 py-2 w-full" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium mb-1">By Location</label>
+            <input value={qLocation} onChange={e=>setQLocation(e.target.value)} placeholder="District or Area" className="border rounded px-3 py-2 w-full" />
+          </div>
+        </div>
+        <div className="mt-3 flex items-center gap-3">
+          <button type="button" onClick={() => { setQName(''); setQId(''); setQEmail(''); setQPhone(''); setQLocation(''); }} className="px-3 py-2 text-sm rounded border hover:bg-gray-50">Clear Filters</button>
+          <span className="text-sm text-gray-600">Showing <span className="font-semibold">{filteredUsers.length}</span> of <span className="font-semibold">{users.length}</span></span>
+        </div>
+      </div>
+
       {users.length === 0 ? (
         <div className="text-center py-12">
           <div className="text-gray-500 text-lg">No users found</div>
@@ -300,7 +361,7 @@ export default function UserTab() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {users.map((user) => (
+                {filteredUsers.map((user) => (
                   <tr key={user._id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">

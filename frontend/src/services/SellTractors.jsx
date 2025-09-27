@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import Select from "react-select"; // Add this import
 import { BASE_URL } from "../util/api.js";
 import { fetchUserLocation } from "../util/userLocation.js";
@@ -13,6 +13,8 @@ function formatNumberWithCommas(num) {
 }
 
 export default function SellTractors() {
+  const locationHook = useLocation();
+  const editId = locationHook?.state?.editId || null;
   const [location, setLocation] = useState("Kamburupitiya");
   const [category, setCategory] = useState("Tractors");
   const [brand, setBrand] = useState("");
@@ -24,6 +26,8 @@ export default function SellTractors() {
   const [negotiable, setNegotiable] = useState(false);
   const [year, setYear] = useState("");
   const [photos, setPhotos] = useState([null, null, null, null, null]);
+  const [existingPhotos, setExistingPhotos] = useState([]);
+  const [removeSet, setRemoveSet] = useState(new Set());
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categories, setCategories] = useState([]);
   const [showValidation, setShowValidation] = useState(false);
@@ -83,9 +87,38 @@ export default function SellTractors() {
     fetchLocations();
     fetchBrands();
 
-    // Fetch user's location and set as default
-    fetchUserLocation(setLocation, setDistrict, setSubLocation);
+    // Fetch user's location and set as default (skip when editing)
+    if (!editId) {
+      fetchUserLocation(setLocation, setDistrict, setSubLocation);
+    }
   }, []);
+
+  // If editing, fetch existing vehicle and prefill
+  useEffect(() => {
+    const run = async () => {
+      if (!editId) return;
+      try {
+        const res = await fetch(`${BASE_URL}/api/sellvehicle/details/${editId}`);
+        const v = await res.json();
+        if (!v || v.error) return;
+        setCategory(v.category || "Tractors");
+        setBrand(v.brand || "");
+        setModel(v.model || "");
+        setTrim(v.trim || "");
+        setCondition(v.condition || "Used");
+        setYear((v.year || "").toString().replace(/[^0-9]/g, ""));
+        setDescription(v.description || "");
+        setPrice(String(v.price || ""));
+        setNegotiable(!!v.negotiable);
+        const locStr = v.subLocation ? `${v.district}, ${v.subLocation}` : (v.district || "");
+        setLocation(locStr || "");
+        setDistrict(v.district || "");
+        setSubLocation(v.subLocation || "");
+        setExistingPhotos(Array.isArray(v.photos) ? v.photos : []);
+      } catch (_) {}
+    };
+    run();
+  }, [editId]);
 
   useEffect(() => {
     const fetchModels = async () => {
@@ -117,6 +150,14 @@ export default function SellTractors() {
     setPhotos(newPhotos);
   };
 
+  const toggleRemoveExisting = (filename) => {
+    setRemoveSet(prev => {
+      const next = new Set(prev);
+      if (next.has(filename)) next.delete(filename); else next.add(filename);
+      return next;
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setShowValidation(true);
@@ -129,59 +170,102 @@ export default function SellTractors() {
       !yearValid ||
       !description ||
       !priceValid ||
-      !photos.some((p) => p)
+      (!editId && !photos.some((p) => p))
     ) {
       return;
     }
     // Generate title from brand and model
     const title = brand && model ? `${brand} ${model}` : "";
-    const formData = new FormData();
-    formData.append("title", title);
-    formData.append("condition", condition);
-    formData.append("brand", brand);
-    formData.append("model", model);
-    formData.append("trim", trim);
-    formData.append("year", year);
-    formData.append("description", description);
-    formData.append("price", price);
-    formData.append("negotiable", negotiable);
-    formData.append("category", category);
-    formData.append("location", location);
-    formData.append("district", district || location.split(",")[0]);
-    formData.append("subLocation", subLocation || (location.split(",")[1] ? location.split(",")[1].trim() : ""));
-    photos.forEach((photo) => {
-      if (photo) formData.append("photos", photo);
-    });
     const token = localStorage.getItem("token"); // Get JWT token
 
     try {
-      const res = await fetch(`${BASE_URL}/api/sellvehicle/add`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${token}` // Add JWT token
-        },
-        body: formData
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSuccess("✅ Post your Ad successfully!");
-        setShowValidation(false);
-        setBrand("");
-        setModel("");
-        setTrim("");
-        setCondition("Used");
-        setYear("");
-        setDescription("");
-        setPrice("");
-        setNegotiable(false);
-        setPhotos([null, null, null, null, null]);
-        setDistrict("");
-        setSubLocation("");
-        setLocation("Kamburupitiya");
-        setTimeout(() => {
-          setSuccess("");
-          navigate("/");
-        }, 2000); // Show alert for 2 seconds, then redirect
+      if (editId) {
+        // Update mode
+        const body = {
+          title,
+          condition,
+          brand,
+          model,
+          trim,
+          year,
+          description,
+          price,
+          negotiable,
+          category,
+          district: district || location.split(",")[0],
+          subLocation: subLocation || (location.split(",")[1] ? location.split(",")[1].trim() : ""),
+        };
+        const res = await fetch(`${BASE_URL}/api/sellvehicle/update/${editId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+          const hasNewFiles = photos.some(p => !!p);
+          const hasRemovals = removeSet.size > 0;
+          if (hasNewFiles || hasRemovals) {
+            const fd = new FormData();
+            if (hasRemovals) fd.append('remove', JSON.stringify(Array.from(removeSet)));
+            photos.forEach((file) => { if (file) fd.append('photos', file); });
+            try {
+              await fetch(`${BASE_URL}/api/sellvehicle/photos/${editId}`, {
+                method: 'PUT',
+                headers: { Authorization: `Bearer ${token}` },
+                body: fd
+              });
+            } catch (_) {}
+          }
+          setSuccess("✅ Updated your ad successfully!");
+          setShowValidation(false);
+          setTimeout(() => {
+            setSuccess("");
+            navigate("/profile", { state: { tab: 'ads' } });
+          }, 1200);
+        }
+      } else {
+        // Create mode
+        const formData = new FormData();
+        formData.append("title", title);
+        formData.append("condition", condition);
+        formData.append("brand", brand);
+        formData.append("model", model);
+        formData.append("trim", trim);
+        formData.append("year", year);
+        formData.append("description", description);
+        formData.append("price", price);
+        formData.append("negotiable", negotiable);
+        formData.append("category", category);
+        formData.append("location", location);
+        formData.append("district", district || location.split(",")[0]);
+        formData.append("subLocation", subLocation || (location.split(",")[1] ? location.split(",")[1].trim() : ""));
+        photos.forEach((photo) => { if (photo) formData.append("photos", photo); });
+        const res = await fetch(`${BASE_URL}/api/sellvehicle/add`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${token}` },
+          body: formData
+        });
+        const data = await res.json();
+        if (data.success) {
+          setSuccess("✅ Post your Ad successfully!");
+          setShowValidation(false);
+          setBrand("");
+          setModel("");
+          setTrim("");
+          setCondition("Used");
+          setYear("");
+          setDescription("");
+          setPrice("");
+          setNegotiable(false);
+          setPhotos([null, null, null, null, null]);
+          setDistrict("");
+          setSubLocation("");
+          setLocation("Kamburupitiya");
+          setTimeout(() => {
+            setSuccess("");
+            navigate("/");
+          }, 2000);
+        }
       }
     } catch (err) {
       // Optionally show error message
@@ -197,7 +281,7 @@ export default function SellTractors() {
           <span role="alert">{success}</span>
         </div>
       )}
-      <h1 className="text-xl sm:text-2xl font-bold mb-4">Fill in the details</h1>
+      <h1 className="text-xl sm:text-2xl font-bold mb-4">{editId ? 'Edit your ad' : 'Fill in the details'}</h1>
       <div className="flex flex-col sm:flex-row gap-2 mb-4 items-center">
         <div className="flex items-center gap-2">
           <span className="text-green-700 font-semibold">
@@ -459,7 +543,25 @@ export default function SellTractors() {
         </div>
         <hr className="my-6" />
         <div>
-          <div className="font-medium mb-2">Add up to 5 photos <span className="text-xs text-gray-500 ml-1">(You must upload at least one photo)</span></div>
+          <div className="font-medium mb-2">Add up to 5 photos <span className="text-xs text-gray-500 ml-1">{editId ? '(Existing photos shown below. You can remove or upload new ones.)' : '(You must upload at least one photo)'}</span></div>
+          {editId && existingPhotos.length > 0 && (
+            <div className="mb-3">
+              <div className="text-sm text-gray-600 mb-1">Existing photos (click to mark for removal):</div>
+              <div className="flex gap-2 flex-wrap">
+                {existingPhotos.map((fname) => (
+                  <button
+                    type="button"
+                    key={fname}
+                    onClick={() => toggleRemoveExisting(fname)}
+                    className={`relative border rounded w-20 h-20 overflow-hidden ${removeSet.has(fname) ? 'ring-2 ring-red-500 opacity-60' : ''}`}
+                    title={removeSet.has(fname) ? 'Marked for removal' : 'Click to remove'}
+                  >
+                    <img src={`${BASE_URL}/sellvehicle/${fname}`} alt="existing" className="w-full h-full object-cover" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
           <div className="flex gap-2 flex-wrap mb-1">
             {photos.map((photo, idx) => (
               <label
@@ -490,7 +592,7 @@ export default function SellTractors() {
               </label>
             ))}
           </div>
-          {showValidation && !photos.some((p) => p) && (
+          {showValidation && !editId && !photos.some((p) => p) && (
             <div className="text-xs text-red-500 mt-1">You must upload at least one photo.</div>
           )}
         </div>
